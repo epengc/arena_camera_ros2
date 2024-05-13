@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>stereo_image_proc</name>
+  <name>depth_vision_node</name>
   <version>0.0.0</version>
   <description>TODO: Package description</description>
   <maintainer email="epengc@icloud.com">novai</maintainer>
@@ -9,16 +9,11 @@
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
-  <depend>cv_bridge</depend>
-  <depend>image_geometry</depend>
-  <depend>image_transport</depend>
-  <depend>message_filters</depend>
   <depend>rclcpp</depend>
-  <depend>rclcpp_components</depend>
-  <depend>sensor_msgs</depend>
-  <depend>stereo_msgs</depend>
+  <depend>rclcpp_componnets</depend>
   <depend>std_msgs</depend>
-  <depend>OpenCV</depend>
+  <depend>std_srvs</depend>
+  <depend>message_filters</depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
