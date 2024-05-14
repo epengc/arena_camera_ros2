@@ -1,3 +1,5 @@
+#include <cv_bridge/cv_bridge.h>
+
 #include <algorithm>
 #include <map>
 #include <memory>
@@ -6,37 +8,25 @@
 #include <rclcpp_components/register_node_macro.hpp>
 #include <sensor_msgs/image_encodings.hpp>
 #include <sstream>
-//#include <stereo_image_proc/stereo_processor.hpp>
-//#include <stereo_msgs/msg/disparity_map.hpp>
-#include <cv_bridge/cv_bridge.h>
-
 #include <string>
 #include <utility>
 #include <vector>
-//#include "image_geometry/stereo_camera_model.hpp"
+
 #include "message_filters/subscriber.h"
-//#include "message_filters/sync_policies/approximate_epsilon_time.h"
 #include "message_filters/sync_policies/approximate_time.h"
 #include "message_filters/sync_policies/exact_time.h"
 #include "message_filters/synchronizer.h"
 
-using ExactPolicy = message_filters::sync_policies::ExactTime<
-    sensor_msgs::msg::images, sensor_msgs::msg::CameraInfo,
-    sensor_msgs::msg::Image, sensor_msgs::msg::CameraInfo>;
-using ApproximatePolicy = message_filters::sync_policies::ApproximateTime<
-    sensor_msgs::msg::Image, sensor_msgs::msg::CameraInfo,
-    sensor_msgs::msg::Image, sensor_msgs::msg::CameraInfo>;
-using ApproximateEpsilonPolicy =
-    message_filters::sync_policies::ApproximateEpsilonTime<
-        sensor_msgs::msg::Image, sensor_msgs::msg::CameraInfo,
-        sensor_msgs::msg::Image, sensor_msgs::msg::CameraInfo>;
-using ExactSync = message_filters::Synchronizer<ExactPolicy>;
-using ApproximateSync = message_filters::Synchronizer<ApproximatePolicy>;
-using ApproximateEpsilonSync =
-    message_filters::Synchronizer<ApproximateEpsilonPolicy>;
-
 namespace stereo_image_proc
 {
+using ExactPolicy =
+    message_filters::sync_policies::ExactTime<sensor_msgs::msg::Image,
+                                              sensor_msgs::msg::Image>;
+using ApproximatePolicy =
+    message_filters::sync_policies::ApproximateTime<sensor_msgs::msg::Image,
+                                                    sensor_msgs::msg::Image>;
+using ExactSync = message_filters::Synchronizer<ExactPolicy>;
+using ApproximateSync = message_filters::Synchronizer<ApproximatePolicy>;
 
 class DisparityNode : public rclcpp::Node
 {
