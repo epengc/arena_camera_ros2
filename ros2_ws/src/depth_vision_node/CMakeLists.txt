@@ -15,6 +15,9 @@ find_package(sensor_msgs REQUIRED)
 find_package(OpenCV REQUIRED)
 find_package(cv_bridge REQUIRED)
 find_package(message_filters REQUIRED)
+find_package(image_transport REQUIRED)
+find_package(stereo_msgs REQUIRED)
+find_package(rmw REQUIRED)
 #---------------------------------------------------------------------------------------
 #
 # ROS2 RUN DEPTH_VISION_NODE <> EXECUTABLE FILE
@@ -27,7 +30,7 @@ set(target_name_disparity start_disparity)
 # CPP DEPS
 include_directories(${OpenCV_INCLUDE_DIRS})
 add_executable(${target_name_disparity} src/disparityMap.cpp)
-ament_target_dependencies(${target_name_disparity} rclcpp rclcpp_components std_msgs std_srvs sensor_msgs cv_bridge message_filters)
+ament_target_dependencies(${target_name_disparity} rclcpp rclcpp_components std_msgs std_srvs sensor_msgs cv_bridge message_filters image_transport stereo_msgs rmw)
 target_link_libraries(${target_name_disparity} ${OpenCV_LIBRARIES})
 
 if(BUILD_TESTING)
