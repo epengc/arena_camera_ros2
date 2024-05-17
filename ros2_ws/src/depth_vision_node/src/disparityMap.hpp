@@ -38,23 +38,13 @@ class DisparityNode : public rclcpp::Node {
   explicit DisparityNode(const rclcpp::NodeOptions& options);
 
  private:
-  enum StereoAlgorithm { SEMI_GLOBAL_BLOCK_MATCHING };
-  // Subscriptions
-  image_transport::SubscriberFilter sub_l_image_, sub_r_image_;
-  using ExactPolicy = message_filters::sync_policies::ExactTime<sensor_msgs::msg::Image,
-                                                                sensor_msgs::msg::Image>;
-  using ApproximatePolicy = message_filters::sync_policies::ApproximateTime<sensor_msgs::msg::Image,
-                                                                            sensor_msgs::msg::Image>;
-  using ExactSync = message_filters::Synchronizer<ExactPolicy>;
-  using ApproximateSync = message_filters::Synchronizer<ApproximatePolicy>;
-  std::shared_ptr<ExactSync> exact_sync_;
-  std::shared_ptr<ApproximateSync> approximate_sync_;
-  // Publications
-  std::shared_ptr<rclcpp::Publisher<stereo_msgs::msg::DisparityImage>> pub_disparity_;
-  // handle to parameters callback
-  rclcpp::Node::OnSetParametersCallbackHandle::SharedPtr on_set_parameters_callback_handle_;
-  void imageCb(const sensor_msgs::msg::Image::ConstSharedPtr& l_image_msg,
-               const sensor_msgs::msg::Image::ConstSharedPtr& r_image_msg);
+   std::string sub_topic01_name_ = "/arena/left_image_raw";
+   std::string sub_topic02_name_ = "/arena/right_image_raw";
+
+   enum StereoAlgorithm { SEMI_GLOBAL_BLOCK_MATCHING };
+   // Subscriptions
+   void imageCb(const sensor_msgs::msg::Image::ConstSharedPtr &l_image_msg,
+                const sensor_msgs::msg::Image::ConstSharedPtr &r_image_msg);
 };
 
 // add disparity calculation parameters
