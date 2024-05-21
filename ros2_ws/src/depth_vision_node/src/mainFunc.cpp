@@ -1,6 +1,5 @@
 #include <memory>
 #include <rclcpp/rclcpp.hpp>
-
 #include "disparityMap.hpp"
 
 int main(int argc, char* argv[]) {
