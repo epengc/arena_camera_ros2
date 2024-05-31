@@ -1,5 +1,5 @@
-#ifndef DISPARITY_PUBLISHER_HPP
-#define DISPARITY_PUBLISHER_HPP
+#ifndef SYNCFRAMERECV_HPP
+#define SYNCFRAMERECV_HPP
 #include <cv_bridge/cv_bridge.h>
 #include <rmw/events_statuses/events_statuses.h>
 
@@ -21,6 +21,7 @@
 #include <sstream>
 #include <stereo_msgs/msg/detail/disparity_image__struct.hpp>
 #include <stereo_msgs/msg/disparity_image.hpp>
+
 #include <string>
 #include <utility>
 #include <vector>
@@ -30,37 +31,18 @@
 #include "message_filters/sync_policies/exact_time.h"
 #include "message_filters/synchronizer.h"
 
-using namespace std::placeholders;
 typedef std::map<std::string, std::pair<double, rcl_interfaces::msg::ParameterDescriptor>> disparityParameters;
 
-namespace stereogopro {
-class DisparityPublisher : public rclcpp::Node {
- public:
-  explicit DisparityPublisher(const rclcpp::NodeOptions& options);
-
- private:
-   ros::NodeHandle nh_;
-   std::string sub_topic01_name_ = "/arena/left_image_raw";
-   std::string sub_topic02_name_ = "/arena/right_image_raw";
-   message_filters::Subscriber<sensor_msgs::Image> camera_left_frame_(this->nh_,
-                                                                      this->sub_topic01_name_,
-                                                                      5);
-   message_filters::Subscriber<sensor_msgs::Image> camera_right_frame_(this->nh_,
-                                                                       this->sub_topic02_name_,
-                                                                       5);
-   enum StereoAlgorithm { SEMI_GLOBAL_BLOCK_MATCHING };
-   // Subscriptions
-   void workingOnDisparity(const sensor_msgs::msg::Image::ConstSharedPtr &l_image_msg, const sensor_msgs::msg::Image::ConstSharedPtr &r_image_msg);
-};
+namespace LUCIDStereo {
 
 // add disparity calculation parameters
-static void add_param_to_map(disparityParameters parameters,
-                             const std::string& name,
-                             const std::string& description,
-                             const double default_value,
-                             const double from_value,
-                             const double to_value,
-                             const double step) {
+static void add_params(disparityParameters parameters,
+                       const std::string& name,
+                       const std::string& description,
+                       const double default_value,
+                       const double from_value,
+                       const double to_value,
+                       const double step) {
   rcl_interfaces::msg::FloatingPointRange floating_point_range;
   floating_point_range.from_value = from_value;
   floating_point_range.to_value = to_value;
@@ -71,21 +53,20 @@ static void add_param_to_map(disparityParameters parameters,
   parameters[name] = std::make_pair(default_value, descriptor);
 }
 
-DisparityNode::DisparityPublisher(const rclcpp::NodeOptions& options) : Node("DisparityNode", options) {
+class SyncFrameRecv : public rclcpp::Node {
+ public:
+  explicit SyncFrameRecv(const rclcpp::NodeOptions& options) : Node("SyncFrameRecv", options){
+    using std::placeholders::_1;
   // TransportHints does not actually declare the parameter
   RCLCPP_INFO(get_logger(), "********************************");
   RCLCPP_INFO(get_logger(), " DisparityNode Init With Params ");
   RCLCPP_INFO(get_logger(), "********************************");
-  // Declare/read parameters
-  this->declare_parameter("queue_size", 5);
-  this->declare_parameter("approximate_sync", false);
-  this->declare_parameter("use_system_default_qos", false);
-  this->declare_parameter<std::string>("intricis_path", "../data/intrinsics.yml");
-  this->declare_parameter<std::string>("extricis_path", "../data/extrinsics.yml");
-
-  using sync_pol = message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image>;
-  message_filters::Synchronizer<sync_pol> sync(sync_pol(10), this->camera_left_frame_, this->camera_right_frame);
-
+  // Declare parameters of prior-settings
+  this->declare_parameter<int>("queue_size", 5);
+  this->declare_parameter<bool>("approximate_sync", false);
+  this->declare_parameter<bool>("use_system_default_qos", false);
+  this->declare_parameter<std::string>("intrincis_path", "../data/intrinsics.yml");
+  this->declare_parameter<std::string>("extrincis_path", "../data/extrinsics.yml");
   // Describe int paramters
   disparityParameters disparity_params;
   add_param_to_map(disparity_params, "stereo_algorithm", "Stereo Algorithm: Block Matching (0) or Semi-Global Block Matching (1)", 0, 0, 1, 1);
@@ -105,28 +86,41 @@ DisparityNode::DisparityPublisher(const rclcpp::NodeOptions& options) : Node("Di
 
   // Declaring parameters triggers the previously registered callback
   this->declare_parameters<disparityParameters>("disparity_params", disparity_params);
-  sync.registerCallBack(std::bind(&DisparityPublisher::workingonDisparity,
-                                  this,
-                                  std::placeholder::_1,
-                                  std::placeholder::_2,
-                                  std::placeholder::_3));
-  
+  subscription_ = this->create_subscription<sensor_msgs::msg::Image>(sub_topic_name_, 10, std::bind(&SyncFrameRecv::disparity_publisher_callback,
+                                                                                                    this,
+                                                                                                    _1));
+  }
+ private:
+  std::string sub_topic_name_ = "/arena_camera_node/images";
+  rclcpp::Subscription<sensor_msgs::msg::Image>::SharePtr subscription_;
+  // Subscriptions
+  void disparity_publisher_callback(const sensor_msgs::msg::Image &image_msg);
+};
+
+void DisparityNode::rectFrame(const cv::Mat &left_frame,
+                              const cv::Mat &right_frame,
+                              cv::Mat &rect_left_frame,
+                              cv::Mat &rect_right_frame) {
 }
 
-void DisparityNode::imageCb(const sensor_msgs::msg::Image::ConstSharedPtr& l_image_msg, const sensor_msgs::msg::Image::ConstSharedPtr& r_image_msg) {
-  // If there are no subscriptions for the disparity image, do nothing
-  if (pub_disparity_->get_subscription_count() == 0u) {
-    return;
-  }
+void SyncFrameRecv::disparity_publisher_callback(const sensor_msgs::msg::Image &sync_frame_msg) {
+  // get sync_frame from ros2 topic and convert them to opencv mat; Format of
+  // sync_frame is 4896x2048
+  const cv::Mat_<uint16_t> sync_frame_cv_mat =
+      cv_bridge::toCvShare(sync_frame_msg, sensor_msgs::image_encodings::MONO16)
+          ->image;
+  // get left and right frame from ros2 topic
+  cv::Mat rect_left_frame_cvmat, rect_right_frame_cvmat;
+  int width = 2448;
+  int height = 2048;
+  cv::Mat left_frame_cvmat = sync_frame_cv_mat(cv::Rect(0, 0, width, height));
+  cv::Mat right_frame_cvmat = sync_frame_cv_mat(cv::Rect(width, height, width, height));
+  
   auto disp_msg = std::make_shared<stereo_msgs::msg::DisparityImage>();
   disp_msg->header = l_image_msg->header;
   disp_msg->image.header = l_image_msg->header;
-  const cv::Mat_<uint16_t> l_image = cv_bridge::toCvShare(l_image_msg, sensor_msgs::image_encodings::MONO16)->image;
-  const cv::Mat_<uint16_t> r_image = cv_bridge::toCvShare(r_image_msg, sensor_msgs::image_encodings::MONO16)->image;
 }
 
-void DisparityNode::rectFrame(const cv::Mat& left_frame, const cv::Mat& right_frame, cv::Mat& rect_left_frame, cv::Mat& rect_right_frame) {}
-
-}  // namespace stereogopro
+} // namespace LUCIDStereo
 
 #endif
