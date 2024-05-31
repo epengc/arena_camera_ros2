@@ -24,14 +24,14 @@ find_package(rmw REQUIRED)
 #
 #---------------------------------------------------------------------------------------
 
-set(target_name_disparity start_disparity)
+set(target_name syncFrameRecv)
 #set(OpenCV_INCLUDE_DIRS "/usr/local/include/opnecv4/opencv2/")
 #set(OpenCV_LIBS "/usr/local/lib/")
 # CPP DEPS
 include_directories(${OpenCV_INCLUDE_DIRS})
-add_executable(${target_name_disparity} src/disparityMap.cpp)
-ament_target_dependencies(${target_name_disparity} rclcpp rclcpp_components std_msgs std_srvs sensor_msgs cv_bridge message_filters image_transport stereo_msgs rmw)
-target_link_libraries(${target_name_disparity} ${OpenCV_LIBRARIES})
+add_executable(${target_name} src/mainFunc.cpp)
+ament_target_dependencies(${target_name} rclcpp rclcpp_components std_msgs std_srvs sensor_msgs cv_bridge message_filters image_transport stereo_msgs rmw)
+target_link_libraries(${target_name} ${OpenCV_LIBRARIES})
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)

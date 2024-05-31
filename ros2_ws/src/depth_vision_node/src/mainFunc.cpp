@@ -1,11 +1,11 @@
 #include <memory>
 #include <rclcpp/rclcpp.hpp>
-#include "disparityMap.hpp"
+#include "syncFrameRecv.hpp"
 
 int main(int argc, char* argv[]) {
   rclcpp::init(argc, argv);
   rclcpp::NodeOptions options;
-  auto disparityNode = std::make_shared<stereogopro::DisparityNode>(options);
-  rclcpp::spin(disparityNode);
+  auto syncFrameRecvNode = std::make_shared<LUCIDStereo::SyncFrameRecv>(options);
+  rclcpp::spin(syncFrameRecvNode);
   rclcpp::shutdown();
 }
