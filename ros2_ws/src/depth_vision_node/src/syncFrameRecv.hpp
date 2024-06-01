@@ -89,6 +89,8 @@ class SyncFrameRecv : public rclcpp::Node {
  private:
   std::string sub_topic_name_ = "/arena_camera_node/images";
   rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr subscription_;
+  rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr publisher_l_;
+  rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr publisher_r_;
   // Subscriptions
   void disparity_publisher_callback(const sensor_msgs::msg::Image &sync_frame_msg);
 };
@@ -98,17 +100,23 @@ void SyncFrameRecv::disparity_publisher_callback(const sensor_msgs::msg::Image &
   RCLCPP_INFO(get_logger(), "Prepare for subscription");
   // get sync_frame from ros2 topic and convert them to opencv mat; Format of
   // sync_frame is 4896x2048
-  // const cv::Mat_<uint16_t> sync_frame_cv_mat = cv_bridge::toCvCopy(sync_frame_msg, sensor_msgs::image_encodings::MONO16)->image;
+  const cv::Mat_<uint16_t> sync_frame_cv_mat = cv_bridge::toCvCopy(sync_frame_msg, sensor_msgs::image_encodings::MONO16)->image;
   // get left and right frame from ros2 topic
-  //cv::Mat rect_left_frame_cvmat, rect_right_frame_cvmat;
-  //int width = sync_frame_msg.width;
-  //int height = sync_frame_msg.height;
-  //cv::Mat left_frame_cvmat = sync_frame_cv_mat(cv::Rect(0, 0, (int)(width / 2), height));
-  //cv::Mat right_frame_cvmat = sync_frame_cv_mat(cv::Rect((int)(width / 2), height, (int)(width / 2), height));
+  cv::Mat rect_left_frame_cvmat, rect_right_frame_cvmat;
+  int width = sync_frame_msg.width;
+  int height = sync_frame_msg.height;
+  cv::Mat left_frame_cvmat = sync_frame_cv_mat(cv::Rect(0, 0, (int)(width / 2), height));
+  cv::Mat right_frame_cvmat = sync_frame_cv_mat(cv::Rect((int)(width / 2), 0, (int)(width / 2), height));
   std_msgs::msg::Header h = sync_frame_msg.header;
   std::stringstream message;
   message<<h.stamp.sec;
   RCLCPP_INFO(this->get_logger(), "Recving a frame with width '%s'", message.str().c_str());
+  publisher_l_ = this->create_publisher<sensor_msgs::msg::Image>("/lucid_camera/left_frame", rclcpp::SensorDataQoS());
+  publisher_r_ = this->create_publisher<sensor_msgs::msg::Image>("/lucid_camera/right_frame", rclcpp::SensorDataQoS());
+  sensor_msgs::msg::Image::SharedPtr msg_l = cv_bridge::CvImage(std_msgs::msg::Header(), "mono16", left_frame_cvmat).toImageMsg();
+  sensor_msgs::msg::Image::SharedPtr msg_r = cv_bridge::CvImage(std_msgs::msg::Header(), "mono16", right_frame_cvmat).toImageMsg();
+  publisher_l_->publish(*msg_l);
+  publisher_r_->publish(*msg_r);
   //auto disp_msg = std::make_shared<stereo_msgs::msg::DisparityImage>();
   //disp_msg->header = l_image_msg->header;
   //disp_msg->image.header = l_image_msg->header;

@@ -156,3 +156,8 @@ Arena Camera deriver for ROS2
 - access to nodemaps
 - settings dump/read to/from file
 - support two devices
+
+# OpenCV 4.9.0 Recompiling from Souce Code
+
+# cv_bridge purge and Recompiling for compatible OpenCV Version
+
