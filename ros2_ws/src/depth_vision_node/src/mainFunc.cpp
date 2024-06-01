@@ -4,8 +4,7 @@
 
 int main(int argc, char* argv[]) {
   rclcpp::init(argc, argv);
-  rclcpp::NodeOptions options;
-  auto syncFrameRecvNode = std::make_shared<LUCIDStereo::SyncFrameRecv>(options);
+  auto syncFrameRecvNode = std::make_shared<LUCIDStereo::SyncFrameRecv>();
   rclcpp::spin(syncFrameRecvNode);
   rclcpp::shutdown();
 }

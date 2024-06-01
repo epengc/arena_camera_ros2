@@ -25,11 +25,8 @@
 #include <string>
 #include <utility>
 #include <vector>
-#include "message_filters/subscriber.h"
-#include "message_filters/sync_policies/approximate_time.h"
-#include "message_filters/sync_policies/exact_time.h"
-#include "message_filters/synchronizer.h"
-
+#include <std_msgs/msg/string.hpp>
+#include <sstream>
 //typedef std::map<std::string, std::pair<double, rcl_interfaces::msg::ParameterDescriptor>> disparityParameters;
 
 namespace LUCIDStereo {
@@ -54,7 +51,7 @@ namespace LUCIDStereo {
 
 class SyncFrameRecv : public rclcpp::Node {
  public:
-  explicit SyncFrameRecv(const rclcpp::NodeOptions& options) : Node("SyncFrameRecv", options){
+  explicit SyncFrameRecv() : Node("SyncFrameRecv"){
     using std::placeholders::_1;
   // TransportHints does not actually declare the parameter
   RCLCPP_INFO(get_logger(), "********************************");
@@ -84,36 +81,34 @@ class SyncFrameRecv : public rclcpp::Node {
   //add_params(disparity_params, "P2", "The second parameter controlling the disparity smoothess (Semi-Global Block Matching only)", 400.0, 0.0, 4000.0, 0.0);
   //// Declaring parameters triggers the previously registered callback
   //this->declare_parameter<disparityParameters>("disparity_params", disparity_params);
-  subscription_ = this->create_subscription<sensor_msgs::msg::Image>(sub_topic_name_, 10, std::bind(&SyncFrameRecv::disparity_publisher_callback,
-                                                                                                    this,
-                                                                                                    _1));
+  // For avoiding incompatible QoSInitialization by using rclcpp::SensorDataQoS()
+  subscription_ = this->create_subscription<sensor_msgs::msg::Image>("/arena_camera_node/images", rclcpp::SensorDataQoS(), std::bind(&SyncFrameRecv::disparity_publisher_callback,
+                                                                                                                                     this,
+                                                                                                                                     _1));
   }
  private:
   std::string sub_topic_name_ = "/arena_camera_node/images";
   rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr subscription_;
   // Subscriptions
-  void disparity_publisher_callback(const sensor_msgs::msg::Image &image_msg);
+  void disparity_publisher_callback(const sensor_msgs::msg::Image &sync_frame_msg);
 };
 
-  //void DisparityNode::rectFrame(const cv::Mat &left_frame,
-  //                              const cv::Mat &right_frame,
-  //                              cv::Mat &rect_left_frame,
-  //                              cv::Mat &rect_right_frame) {
-  //}
 
 void SyncFrameRecv::disparity_publisher_callback(const sensor_msgs::msg::Image &sync_frame_msg) {
+  RCLCPP_INFO(get_logger(), "Prepare for subscription");
   // get sync_frame from ros2 topic and convert them to opencv mat; Format of
   // sync_frame is 4896x2048
-  const cv::Mat_<uint16_t> sync_frame_cv_mat =
-      cv_bridge::toCvCopy(sync_frame_msg, sensor_msgs::image_encodings::MONO16)
-          ->image;
+  // const cv::Mat_<uint16_t> sync_frame_cv_mat = cv_bridge::toCvCopy(sync_frame_msg, sensor_msgs::image_encodings::MONO16)->image;
   // get left and right frame from ros2 topic
-  cv::Mat rect_left_frame_cvmat, rect_right_frame_cvmat;
-  int width = 2448;
-  int height = 2048;
-  cv::Mat left_frame_cvmat = sync_frame_cv_mat(cv::Rect(0, 0, width, height));
-  cv::Mat right_frame_cvmat = sync_frame_cv_mat(cv::Rect(width, height, width, height));
-  
+  //cv::Mat rect_left_frame_cvmat, rect_right_frame_cvmat;
+  //int width = sync_frame_msg.width;
+  //int height = sync_frame_msg.height;
+  //cv::Mat left_frame_cvmat = sync_frame_cv_mat(cv::Rect(0, 0, (int)(width / 2), height));
+  //cv::Mat right_frame_cvmat = sync_frame_cv_mat(cv::Rect((int)(width / 2), height, (int)(width / 2), height));
+  std_msgs::msg::Header h = sync_frame_msg.header;
+  std::stringstream message;
+  message<<h.stamp.sec;
+  RCLCPP_INFO(this->get_logger(), "Recving a frame with width '%s'", message.str().c_str());
   //auto disp_msg = std::make_shared<stereo_msgs::msg::DisparityImage>();
   //disp_msg->header = l_image_msg->header;
   //disp_msg->image.header = l_image_msg->header;
