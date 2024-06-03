@@ -29,6 +29,7 @@ set(target_name recv)
 #set(OpenCV_LIBS "/usr/local/lib/")
 # CPP DEPS
 include_directories(${OpenCV_INCLUDE_DIRS})
+#include_directories("/usr/local/include/opencv4/opencv2/")
 add_executable(${target_name} src/mainFunc.cpp)
 ament_target_dependencies(${target_name} rclcpp rclcpp_components std_msgs std_srvs sensor_msgs cv_bridge message_filters image_transport stereo_msgs rmw)
 target_link_libraries(${target_name} ${OpenCV_LIBRARIES})

@@ -1,6 +1,8 @@
 #ifndef SYNCFRAMERECV_HPP
 #define SYNCFRAMERECV_HPP
 #include <cv_bridge/cv_bridge.h>
+#include <opencv4/opencv2/highgui.hpp>
+#include <opencv4/opencv2/imgcodecs.hpp>
 #include <rmw/events_statuses/events_statuses.h>
 
 #include <algorithm>
@@ -21,12 +23,13 @@
 #include <sstream>
 #include <stereo_msgs/msg/detail/disparity_image__struct.hpp>
 #include <stereo_msgs/msg/disparity_image.hpp>
-
+#include <opencv2/imgcodecs.hpp>
 #include <string>
 #include <utility>
 #include <vector>
 #include <std_msgs/msg/string.hpp>
 #include <sstream>
+#include <opencv2/highgui.hpp>
 //typedef std::map<std::string, std::pair<double, rcl_interfaces::msg::ParameterDescriptor>> disparityParameters;
 
 namespace LUCIDStereo {
@@ -91,6 +94,7 @@ class SyncFrameRecv : public rclcpp::Node {
   rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr subscription_;
   rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr publisher_l_;
   rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr publisher_r_;
+  rclcpp::SensorDataQoS pub_qos_;
   // Subscriptions
   void disparity_publisher_callback(const sensor_msgs::msg::Image &sync_frame_msg);
 };
@@ -107,16 +111,26 @@ void SyncFrameRecv::disparity_publisher_callback(const sensor_msgs::msg::Image &
   int height = sync_frame_msg.height;
   cv::Mat left_frame_cvmat = sync_frame_cv_mat(cv::Rect(0, 0, (int)(width / 2), height));
   cv::Mat right_frame_cvmat = sync_frame_cv_mat(cv::Rect((int)(width / 2), 0, (int)(width / 2), height));
+  //cv::Mat left_frame_cvmat = sync_frame_cv_mat;
+  //cv::Mat right_frame_cvmat = sync_frame_cv_mat;
+  //std::vector<int> compression_params;
+  //compression_params.push_back(cv::IMWRITE_PNG_COMPRESSION);
+  //compression_params.push_back(9);
+  //cv::imwrite("./samples_left.png", left_frame_cvmat, compression_params);
+  //cv::imwrite("./samples_right.png", right_frame_cvmat, compression_params);
   std_msgs::msg::Header h = sync_frame_msg.header;
   std::stringstream message;
   message<<h.stamp.sec;
   RCLCPP_INFO(this->get_logger(), "Recving a frame with width '%s'", message.str().c_str());
-  publisher_l_ = this->create_publisher<sensor_msgs::msg::Image>("/lucid_camera/left_frame", rclcpp::SensorDataQoS());
-  publisher_r_ = this->create_publisher<sensor_msgs::msg::Image>("/lucid_camera/right_frame", rclcpp::SensorDataQoS());
-  sensor_msgs::msg::Image::SharedPtr msg_l = cv_bridge::CvImage(std_msgs::msg::Header(), "mono16", left_frame_cvmat).toImageMsg();
-  sensor_msgs::msg::Image::SharedPtr msg_r = cv_bridge::CvImage(std_msgs::msg::Header(), "mono16", right_frame_cvmat).toImageMsg();
-  publisher_l_->publish(*msg_l);
-  publisher_r_->publish(*msg_r);
+  publisher_l_ = this->create_publisher<sensor_msgs::msg::Image>("/lucid_camera/left_frame", pub_qos_);
+  publisher_r_ = this->create_publisher<sensor_msgs::msg::Image>("/lucid_camera/right_frame", pub_qos_);
+  sensor_msgs::msg::Image::SharedPtr msg_l = cv_bridge::CvImage(std_msgs::msg::Header(), "bgr8", left_frame_cvmat).toImageMsg();
+  sensor_msgs::msg::Image::SharedPtr msg_r = cv_bridge::CvImage(std_msgs::msg::Header(), "bgr8", right_frame_cvmat).toImageMsg();
+  publisher_l_->publish(std::move(*msg_l));
+  publisher_r_->publish(std::move(*msg_r));
+  cv::namedWindow("FrameDisplay", cv::WINDOW_NORMAL);
+  cv::resizeWindow("FrameDisplay", 600, 600);
+  cv::imshow("FrameDisplay", left_frame_cvmat);
   //auto disp_msg = std::make_shared<stereo_msgs::msg::DisparityImage>();
   //disp_msg->header = l_image_msg->header;
   //disp_msg->image.header = l_image_msg->header;
