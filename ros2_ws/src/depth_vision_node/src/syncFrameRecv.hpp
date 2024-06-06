@@ -127,7 +127,7 @@ void SyncFrameRecv::disparity_publisher_callback(const sensor_msgs::msg::Image &
   try{
     int sync_frame_width = sync_frame_msg.width;
     int sync_frame_height = sync_frame_msg.height;
-    int setp = sync_frame_msg.step;
+    int step = sync_frame_msg.step;
     cv::Mat outImg;
     cv::Mat dual_frame(sync_frame_height, step, CV_8UC1, cv::Scalar(0));
     std::memcpy(dual_frame.ptr<uchar>(0), &sync_frame_msg.data[0], step*sync_frame_height);
