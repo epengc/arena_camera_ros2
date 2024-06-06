@@ -129,6 +129,7 @@ void SyncFrameRecv::disparity_publisher_callback(const sensor_msgs::msg::Image &
     int sync_frame_height = sync_frame_msg.height;
     cv::Mat dual_frame(sync_frame_height, sync_frame_width, CV_8UC1, cv::Scalar(0));
     std::memcpy(dual_frame.ptr<uchar>(0), &sync_frame_msg.data[0], sync_frame_width*sync_frame_height);
+    cv::imshow("view", dual_frame);
   }catch(...){
     RCLCPP_INFO(this->get_logger(), "Fail to copy sensor_msgs::msg::Image.data to cv::Mat ");
   }
