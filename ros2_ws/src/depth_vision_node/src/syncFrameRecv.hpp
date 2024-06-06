@@ -122,6 +122,7 @@ void SyncFrameRecv::disparity_publisher_callback(const sensor_msgs::msg::Image &
   ss<<" width = "<< sync_frame_msg.width;
   ss<<" height = "<< sync_frame_msg.height; 
   ss<<" step = "<< sync_frame_msg.step; 
+  ss<<" bigendian = "<<sync_frame_msg.is_bigendian;
   RCLCPP_INFO(this->get_logger(), "Recved frames in details '%s'", ss.str().c_str());
   try{
     int sync_frame_width = sync_frame_msg.width;
