@@ -105,7 +105,7 @@ void SyncFrameRecv::disparity_publisher_callback(const sensor_msgs::msg::Image &
   // RCLCPP_INFO(get_logger(), "subscription is done");
   // get sync_frame from ros2 topic and convert them to opencv mat; Format of
   // sync_frame is 4896x2048
-  // const cv::Mat_<uint16_t> sync_frame_cv_mat = cv_bridge::toCvCopy(sync_frame_msg, sensor_msgs::image_encodings::MONO16)->image;
+  // const cv::Mat_<uint16_t> sync_frame_cv_mat = cv_bridge::toCvCopy(sync_frame_msg, sensor_msgs::image_encodings::MONO8)->image;
   // get left and right frame from ros2 topic
   // cv::Mat rect_left_frame_cvmat, rect_right_frame_cvmat;
   //int width = sync_frame_msg.width;
@@ -126,9 +126,10 @@ void SyncFrameRecv::disparity_publisher_callback(const sensor_msgs::msg::Image &
   try{
     int sync_frame_width = sync_frame_msg.width;
     int sync_frame_height = sync_frame_msg.height;
+    int setp = sync_frame_msg.step;
     cv::Mat outImg;
-    cv::Mat dual_frame(sync_frame_height, sync_frame_width, CV_8UC1, cv::Scalar(0));
-    std::memcpy(dual_frame.ptr<uchar>(0), &sync_frame_msg.data[0], sync_frame_width*sync_frame_height);
+    cv::Mat dual_frame(sync_frame_height, step, CV_8UC1, cv::Scalar(0));
+    std::memcpy(dual_frame.ptr<uchar>(0), &sync_frame_msg.data[0], step*sync_frame_height);
     cv::resize(dual_frame, outImg, cv::Size(), 0.5, 0.5);
     cv::imshow("view", outImg);
     cv::Mat left_frame_cvmat, right_frame_cvmat, rect_left_frame_cvmat, rect_right_frame_cvmat;
