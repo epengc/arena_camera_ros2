@@ -5,10 +5,11 @@
 int main(int argc, char* argv[]) {
   rclcpp::init(argc, argv);
   auto syncFrameRecvNode = std::make_shared<LUCIDStereo::SyncFrameRecv>();
-  cv::namedWindow("view", 0);
-  cv::resizeWindow("view", 1600, 600);
+  cv::namedWindow("left", 0);
+  cv::namedWindow("right", 0);
   cv::startWindowThread();
   rclcpp::spin(syncFrameRecvNode);
-  cv::destroyWindow("view");
+  cv::destroyWindow("left");
+  cv::destroyWindow("right");
   rclcpp::shutdown();
 }

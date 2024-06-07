@@ -488,8 +488,10 @@ void ArenaCameraNode::set_nodes_pixelformat_()
     }
 
     try {
+      //Arena::SetNodeValue<GenICam::gcstring>(nodemap, "PixelFormat",
+      //                                       pixelformat_pfnc_.c_str());
       Arena::SetNodeValue<GenICam::gcstring>(nodemap, "PixelFormat",
-                                             pixelformat_pfnc_.c_str());
+                                             "DualMono8");
       log_info(std::string("\tPixelFormat set to ") + pixelformat_pfnc_);
 
     } catch (GenICam::GenericException& e) {

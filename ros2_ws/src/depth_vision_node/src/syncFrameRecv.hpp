@@ -105,7 +105,7 @@ void SyncFrameRecv::disparity_publisher_callback(const sensor_msgs::msg::Image &
   // RCLCPP_INFO(get_logger(), "subscription is done");
   // get sync_frame from ros2 topic and convert them to opencv mat; Format of
   // sync_frame is 4896x2048
-  // const cv::Mat_<uint16_t> sync_frame_cv_mat = cv_bridge::toCvCopy(sync_frame_msg, sensor_msgs::image_encodings::MONO8)->image;
+  // const cv::Mat_<uint8_t> sync_frame_cv_mat = cv_bridge::toCvCopy(sync_frame_msg, sensor_msgs::image_encodings::MONO8)->image;
   // get left and right frame from ros2 topic
   // cv::Mat rect_left_frame_cvmat, rect_right_frame_cvmat;
   //int width = sync_frame_msg.width;
@@ -122,7 +122,7 @@ void SyncFrameRecv::disparity_publisher_callback(const sensor_msgs::msg::Image &
   ss<<" width = "<< sync_frame_msg.width;
   ss<<" height = "<< sync_frame_msg.height; 
   ss<<" step = "<< sync_frame_msg.step; 
-  ss<<" bigendian = "<<sync_frame_msg.is_bigendian;
+  ss<<" encoding = "<<sync_frame_msg.encoding;
   RCLCPP_INFO(this->get_logger(), "Recved frames in details '%s'", ss.str().c_str());
   try{
     int sync_frame_width = sync_frame_msg.width;
@@ -131,14 +131,20 @@ void SyncFrameRecv::disparity_publisher_callback(const sensor_msgs::msg::Image &
     cv::Mat outImg;
     cv::Mat dual_frame(sync_frame_height, step, CV_8UC1, cv::Scalar(0));
     std::memcpy(dual_frame.ptr<uchar>(0), &sync_frame_msg.data[0], step*sync_frame_height);
-    cv::resize(dual_frame, outImg, cv::Size(), 0.5, 0.5);
-    cv::imshow("view", outImg);
-    cv::Mat left_frame_cvmat, right_frame_cvmat, rect_left_frame_cvmat, rect_right_frame_cvmat;
+    //cv::resize(dual_frame, outImg, cv::Size(), 0.5, 0.5);
+    //cv::imshow("view", dual_frame);
+    cv::Mat left_frame_cvmat(sync_frame_height, (int)(step/2), CV_8UC1, cv::Scalar(0));
+    cv::Mat right_frame_cvmat(sync_frame_height, (int)(step/2), CV_8UC1, cv::Scalar(0));
+    cv::Mat rect_left_frame_cvmat, rect_right_frame_cvmat;
     rectify_frames(left_frame_cvmat,
                    right_frame_cvmat,
                    rect_left_frame_cvmat,
                    rect_right_frame_cvmat,
                    std::move(dual_frame));
+    //cv::resize(left_frame_cvmat, outImg, cv::Size(), 1, 1);
+    cv::imshow("left", left_frame_cvmat);
+    //cv::resize(right_frame_cvmat, outImg, cv::Size(), 1, 1);
+    cv::imshow("right",right_frame_cvmat);
     //cv::imshow("view", );
   }catch(...){
     RCLCPP_INFO(this->get_logger(), "Fail to copy sensor_msgs::msg::Image.data to cv::Mat ");
@@ -164,10 +170,14 @@ void SyncFrameRecv::rectify_frames(cv::Mat& left_frame,
                                    cv::Mat&& dual_frame){
   int width = dual_frame.cols;
   int height = dual_frame.rows;
-  left_frame = dual_frame(cv::Rect(0, 0, (int)(width/2), height));
-  right_frame = dual_frame(cv::Rect((int)(width/2), 0, (int)(width/2), height));
+  for(int col=0; col<(int)(width/2); col++){
+    for(int row=0; row<height; row++){
+      right_frame.at<uint8_t>(row, col) = dual_frame.at<uint8_t>(row, col*2);
+      left_frame.at<uint8_t>(row, col) = dual_frame.at<uint8_t>(row, col*2+1);
+    }
   rect_left_frame = left_frame;
   rect_right_frame = right_frame;
+  }
 }
 } // namespace LUCIDStereo
 
