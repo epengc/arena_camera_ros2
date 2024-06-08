@@ -1,6 +1,6 @@
 #ifndef SYNCFRAMERECV_HPP
 #define SYNCFRAMERECV_HPP
-#include <cv_bridge/cv_bridge.h>
+//#include <cv_bridge/cv_bridge.h>
 #include <opencv4/opencv2/highgui.hpp>
 #include <opencv4/opencv2/imgcodecs.hpp>
 #include <rmw/events_statuses/events_statuses.h>
@@ -110,21 +110,21 @@ class SyncFrameRecv : public rclcpp::Node {
    subscription_ = this->create_subscription<sensor_msgs::msg::Image>("/arena_camera_node/images", rclcpp::SensorDataQoS(), std::bind(&SyncFrameRecv::disparity_publisher_callback,
                                                                                                                                       this,
                                                                                                                                       _1));
-   int frame_step = (int)(frame_step_/2);
-   cv::Mat left(frame_row_, frame_step, CV_8UC1, cv::Scalar(0));
-   cv::Mat right(frame_row_, frame_step, CV_8UC1, cv::Scalar(0));
-   for(int col=0; col<frame_step; col++){
-     for(int row=0; row<frame_row_; row++){
-       right.at<uint8_t>(row, col) = dual_frame_ptr_[row*frame_step+col*2];
-       left.at<uint8_t>(row, col) = dual_frame_ptr_[row*frame_step+col*2+1];
-     }
-   }
-   cv::Mat rect_left, rect_right;
-   cv::stereoRectify(M1_, D1_, M2_, D2_, left.size(), R_, T_, R1_, R2_, P1_, P2_, Q_, cv::CALIB_ZERO_DISPARITY, -1, right.size(), &roi1_, &roi2_);
-   cv::initUndistortRectifyMap(M1_, D1_, R1_, P1_, left.size(), CV_16SC2, map11_, map12_);
-   cv::initUndistortRectifyMap(M2_, D2_, R2_, P2_, right.size(), CV_16SC2, map21_, map22_);
-   cv::remap(left, rect_left, map11_, map12_, cv::INTER_LINEAR);
-   cv::remap(right, rect_right, map21_, map22_, cv::INTER_LINEAR);
+   //int frame_step = (int)(frame_step_/2);
+   //cv::Mat left(frame_row_, frame_step, CV_8UC1, cv::Scalar(0));
+   //cv::Mat right(frame_row_, frame_step, CV_8UC1, cv::Scalar(0));
+   //for(int col=0; col<frame_step; col++){
+   //  for(int row=0; row<frame_row_; row++){
+   //    right.at<uint8_t>(row, col) = dual_frame_ptr_[row*frame_step+col*2];
+   //    left.at<uint8_t>(row, col) = dual_frame_ptr_[row*frame_step+col*2+1];
+   //  }
+   //}
+   //cv::Mat rect_left, rect_right;
+   //cv::stereoRectify(M1_, D1_, M2_, D2_, left.size(), R_, T_, R1_, R2_, P1_, P2_, Q_, cv::CALIB_ZERO_DISPARITY, -1, right.size(), &roi1_, &roi2_);
+   //cv::initUndistortRectifyMap(M1_, D1_, R1_, P1_, left.size(), CV_16SC2, map11_, map12_);
+   //cv::initUndistortRectifyMap(M2_, D2_, R2_, P2_, right.size(), CV_16SC2, map21_, map22_);
+   //cv::remap(left, rect_left, map11_, map12_, cv::INTER_LINEAR);
+   //cv::remap(right, rect_right, map21_, map22_, cv::INTER_LINEAR);
   }
 
   void rectify_frames(cv::Mat& left_frame, cv::Mat& right_frame, cv::Mat& rect_left_frame, cv::Mat& rect_right_frame, cv::Mat&& dual_frames);
@@ -194,9 +194,9 @@ void SyncFrameRecv::disparity_publisher_callback(const sensor_msgs::msg::Image &
                    rect_right_frame_cvmat,
                    std::move(dual_frame));
     //cv::resize(left_frame_cvmat, outImg, cv::Size(), 1, 1);
-    cv::imshow("left", left_frame_cvmat);
+    cv::imshow("left", rect_left_frame_cvmat);
     //cv::resize(right_frame_cvmat, outImg, cv::Size(), 1, 1);
-    cv::imshow("right",right_frame_cvmat);
+    cv::imshow("right",rect_right_frame_cvmat);
     //cv::imshow("view", );
   } catch (...) {
     RCLCPP_INFO(this->get_logger(), "Fail to copy sensor_msgs::msg::Image.data to cv::Mat ");
@@ -227,12 +227,12 @@ void SyncFrameRecv::rectify_frames(cv::Mat& left_frame,
       right_frame.at<uint8_t>(row, col) = dual_frame.at<uint8_t>(row, col*2);
       left_frame.at<uint8_t>(row, col) = dual_frame.at<uint8_t>(row, col*2+1);
     }
-    //cv::stereoRectify(M1_, D1_, M2_, D2_, left_frame.size(), R_, T_, R1_, R2_, P1_, P2_, Q_, cv::CALIB_ZERO_DISPARITY, -1, right_frame.size(), &roi1_, &roi2_);
-    //cv::initUndistortRectifyMap(M1_, D1_, R1_, P1_, left_frame.size(), CV_16SC2, map11_, map12_);
-    //cv::initUndistortRectifyMap(M2, D2, R2, P2, right_frame.size(), CV_16SC2, map21, map22);
-    //cv::remap(left_frame, left_frame_rect, map11, map12, cv::INTER_LINEAR);
-    //cv::remap(right_frame, right_frame_rect, map21, map22, cv::INTER_LINEAR);
   }
+  cv::stereoRectify(M1_, D1_, M2_, D2_, left_frame.size(), R_, T_, R1_, R2_, P1_, P2_, Q_, cv::CALIB_ZERO_DISPARITY, -1, right_frame.size(), &roi1_, &roi2_);
+  cv::initUndistortRectifyMap(M1_, D1_, R1_, P1_, left_frame.size(), CV_16SC2, map11_, map12_);
+  cv::initUndistortRectifyMap(M2_, D2_, R2_, P2_, right_frame.size(), CV_16SC2, map21_, map22_);
+  cv::remap(left_frame, rect_left_frame, map11_, map12_, cv::INTER_LINEAR);
+  cv::remap(right_frame, rect_right_frame, map21_, map22_, cv::INTER_LINEAR);
 }
 } // namespace LUCIDStereo
 
