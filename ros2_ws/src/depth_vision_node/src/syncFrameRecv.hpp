@@ -61,63 +61,72 @@ namespace LUCIDStereo {
 class SyncFrameRecv : public rclcpp::Node {
  public:
   explicit SyncFrameRecv() : Node("SyncFrameRecv"){
-    using std::placeholders::_1;
-  // TransportHints does not actually declare the parameter
-  RCLCPP_INFO(get_logger(), "********************************");
-  RCLCPP_INFO(get_logger(), " DisparityNode Init With Params ");
-  RCLCPP_INFO(get_logger(), "********************************");
-  // Declare parameters of prior-settings
-  this->declare_parameter<int>("queue_size", 5);
-  this->declare_parameter<bool>("approximate_sync", false);
-  this->declare_parameter<bool>("use_system_default_qos", false);
-  this->declare_parameter<std::string>("intrincis_path", "../data/intrinsics.yml");
-  this->declare_parameter<std::string>("extrincis_path", "../data/extrinsics.yml");
-  std::string intrinsic_filename = "./data/intrinsics.yml";
-  std::string extrinsic_filename = "./data/extrinsics.yml";
-  cv::FileStorage fs_in(intrinsic_filename, cv::FileStorage::READ);
-  if(!fs_in.isOpened()){
-    RCLCPP_ERROR(this->get_logger(), "Fail to open intrinsic file.");
+   using std::placeholders::_1;
+   // TransportHints does not actually declare the parameter
+   RCLCPP_INFO(get_logger(), "********************************");
+   RCLCPP_INFO(get_logger(), " DisparityNode Init With Params ");
+   RCLCPP_INFO(get_logger(), "********************************");
+   // Declare parameters of prior-settings
+   this->declare_parameter<int>("queue_size", 5);
+   this->declare_parameter<bool>("approximate_sync", false);
+   this->declare_parameter<bool>("use_system_default_qos", false);
+   this->declare_parameter<std::string>("intrincis_path", "../data/intrinsics.yml");
+   this->declare_parameter<std::string>("extrincis_path", "../data/extrinsics.yml");
+   std::string intrinsic_filename = "./data/intrinsics.yml";
+   std::string extrinsic_filename = "./data/extrinsics.yml";
+   cv::FileStorage fs_in(intrinsic_filename, cv::FileStorage::READ);
+   if(!fs_in.isOpened()){
+     RCLCPP_ERROR(this->get_logger(), "Fail to open intrinsic file.");
+   }
+   fs_in["M1"] >> M1_;
+   fs_in["D1"] >> D1_;
+   fs_in["M2"] >> M2_;
+   fs_in["D2"] >> D2_;
+   cv::FileStorage fs_ex(extrinsic_filename, cv::FileStorage::READ);
+   if(!fs_ex.isOpened()){
+     RCLCPP_ERROR(this->get_logger(), "Fail to open extrinsic file.");
+   }
+   fs_ex["R"] >> R_;
+   fs_ex["T"] >> T_;
+   // Declare parameters of disparityMap work
+   //disparityParameters disparity_params;
+   //add_params(disparity_params, "stereo_algorithm", "Stereo Algorithm: Block Matching (0) or Semi-Global Block Matching (1)", 0, 0, 1, 1);
+   //add_params(disparity_params, "prefilter_size", "Normalization window size in pixels (must be odd)", 9, 5, 255, 2);
+   //add_params(disparity_params, "prefilter_cap", "Bound on normalized pixel values", 31, 1, 63, 1);
+   //add_params(disparity_params, "corrlation_window_size", "SAD correlation window width in pixels (must be odd)", 15, 5, 255, 2);
+   //add_params(disparity_params, "min_disparity", "Disparity to begin search at in pixels", 0, -2048, 2048, 1);
+   //add_params(disparity_params, "diparity_range", "Number of disparities to search in pixels (must be a multiple of 16)", 64, 32, 4096, 16);
+   //add_params(disparity_params, "texture_threshold", "Filter out if SAD window response does not exceed texture threshold", 10, 0, 10000, 1);
+   //add_params(disparity_params, "speckle_size", "Reject regions smaller than this size in pixels", 100, 0, 1000, 1);
+   //add_params(disparity_params, "speckle_range", "Maximum allowed difference between detected disparities", 4, 0, 31, 1);
+   //add_params(disparity_params, "disp12_max_diff", "Maximum allowed difference in the left-right disparity(Semi-Global Block Matching Only)", 0, 0, 128, 1);
+   //add_params(disparity_params, "sgbm_mode", "Mode of the SGBM stereo matcher.", 0, 0, 3, 1);
+   //add_params(disparity_params, "uniqueness_ratio", "Filter out if best match does not sufficiently exceed the next-best match ", 15.0, 0.0, 100.0, 0.0);
+   //add_params(disparity_params, "P1", "The first parameter controlling the disparity smoothness (Semi-Global Block Matching only)", 200.0, 0.0, 4000.0, 0.0);
+   //add_params(disparity_params, "P2", "The second parameter controlling the disparity smoothess (Semi-Global Block Matching only)", 400.0, 0.0, 4000.0, 0.0);
+   //// Declaring parameters triggers the previously registered callback
+   //this->declare_parameter<disparityParameters>("disparity_params", disparity_params);
+   // For avoiding incompatible QoSInitialization by using rclcpp::SensorDataQoS()
+   subscription_ = this->create_subscription<sensor_msgs::msg::Image>("/arena_camera_node/images", rclcpp::SensorDataQoS(), std::bind(&SyncFrameRecv::disparity_publisher_callback,
+                                                                                                                                      this,
+                                                                                                                                      _1));
+   int frame_step = (int)(frame_step_/2);
+   cv::Mat left(frame_row_, frame_step, CV_8UC1, cv::Scalar(0));
+   cv::Mat right(frame_row_, frame_step, CV_8UC1, cv::Scalar(0));
+   for(int col=0; col<frame_step; col++){
+     for(int row=0; row<frame_row_; row++){
+       right.at<uint8_t>(row, col) = dual_frame_ptr_[row*frame_step+col*2];
+       left.at<uint8_t>(row, col) = dual_frame_ptr_[row*frame_step+col*2+1];
+     }
+   }
+   cv::Mat rect_left, rect_right;
+   cv::stereoRectify(M1_, D1_, M2_, D2_, left.size(), R_, T_, R1_, R2_, P1_, P2_, Q_, cv::CALIB_ZERO_DISPARITY, -1, right.size(), &roi1_, &roi2_);
+   cv::initUndistortRectifyMap(M1_, D1_, R1_, P1_, left.size(), CV_16SC2, map11_, map12_);
+   cv::initUndistortRectifyMap(M2_, D2_, R2_, P2_, right.size(), CV_16SC2, map21_, map22_);
+   cv::remap(left, rect_left, map11_, map12_, cv::INTER_LINEAR);
+   cv::remap(right, rect_right, map21_, map22_, cv::INTER_LINEAR);
   }
-  fs_in["M1"] >> M1_;
-  fs_in["D1"] >> D1_;
-  fs_in["M2"] >> M2_;
-  fs_in["D2"] >> D2_;
-  cv::FileStorage fs_ex(extrinsic_filename, cv::FileStorage::READ);
-  if(!fs_ex.isOpened()){
-    RCLCPP_ERROR(this->get_logger(), "Fail to open extrinsic file.");
-  }
-  fs_ex["R"] >> R_;
-  fs_ex["T"] >> T_;
-  // Declare parameters of disparityMap work
-  //disparityParameters disparity_params;
-  //add_params(disparity_params, "stereo_algorithm", "Stereo Algorithm: Block Matching (0) or Semi-Global Block Matching (1)", 0, 0, 1, 1);
-  //add_params(disparity_params, "prefilter_size", "Normalization window size in pixels (must be odd)", 9, 5, 255, 2);
-  //add_params(disparity_params, "prefilter_cap", "Bound on normalized pixel values", 31, 1, 63, 1);
-  //add_params(disparity_params, "corrlation_window_size", "SAD correlation window width in pixels (must be odd)", 15, 5, 255, 2);
-  //add_params(disparity_params, "min_disparity", "Disparity to begin search at in pixels", 0, -2048, 2048, 1);
-  //add_params(disparity_params, "diparity_range", "Number of disparities to search in pixels (must be a multiple of 16)", 64, 32, 4096, 16);
-  //add_params(disparity_params, "texture_threshold", "Filter out if SAD window response does not exceed texture threshold", 10, 0, 10000, 1);
-  //add_params(disparity_params, "speckle_size", "Reject regions smaller than this size in pixels", 100, 0, 1000, 1);
-  //add_params(disparity_params, "speckle_range", "Maximum allowed difference between detected disparities", 4, 0, 31, 1);
-  //add_params(disparity_params, "disp12_max_diff", "Maximum allowed difference in the left-right disparity(Semi-Global Block Matching Only)", 0, 0, 128, 1);
-  //add_params(disparity_params, "sgbm_mode", "Mode of the SGBM stereo matcher.", 0, 0, 3, 1);
-  //add_params(disparity_params, "uniqueness_ratio", "Filter out if best match does not sufficiently exceed the next-best match ", 15.0, 0.0, 100.0, 0.0);
-  //add_params(disparity_params, "P1", "The first parameter controlling the disparity smoothness (Semi-Global Block Matching only)", 200.0, 0.0, 4000.0, 0.0);
-  //add_params(disparity_params, "P2", "The second parameter controlling the disparity smoothess (Semi-Global Block Matching only)", 400.0, 0.0, 4000.0, 0.0);
-  //// Declaring parameters triggers the previously registered callback
-  //this->declare_parameter<disparityParameters>("disparity_params", disparity_params);
-  // For avoiding incompatible QoSInitialization by using rclcpp::SensorDataQoS()
-  subscription_ = this->create_subscription<sensor_msgs::msg::Image>("/arena_camera_node/images", rclcpp::SensorDataQoS(), std::bind(&SyncFrameRecv::disparity_publisher_callback,
-                                                                                                                                     this,
-                                                                                                                                     _1));
-  cv::Mat left(sync_frame_height, (int)(step/2), CV_8UC1, cv::Scalar(0));
-  cv::Mat right(sync_frame_height, (int)(step/2), CV_8UC1, cv::Scalar(0));
-  for(int col=0; col<2448; col++){
-    for(int row=0; row<2048; row++){
-      right.at<uint8_t>(row, col) = *dual_frame_ptr(row, col*2);
-      left.at<uint8_t>(row, col) = *dual_frame.at<uint8_t>(row, col*2+1);
-    }
-  }
+
   void rectify_frames(cv::Mat& left_frame, cv::Mat& right_frame, cv::Mat& rect_left_frame, cv::Mat& rect_right_frame, cv::Mat&& dual_frames);
   ~SyncFrameRecv(){
     delete [] dual_frame_ptr_;
@@ -128,6 +137,9 @@ class SyncFrameRecv : public rclcpp::Node {
   cv::Rect roi1_, roi2_;
   cv::Mat R_, T_, R1_, P1_, R2_, P2_, Q_;
   cv::Mat map11_, map12_, map21_, map22_;
+  int frame_col_;
+  int frame_row_;
+  int frame_step_;
   std::string sub_topic_name_ = "/arena_camera_node/images";
   rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr subscription_;
   rclcpp::SensorDataQoS pub_qos_;
@@ -159,7 +171,11 @@ void SyncFrameRecv::disparity_publisher_callback(const sensor_msgs::msg::Image &
   ss<<" step = "<< sync_frame_msg.step; 
   ss<<" encoding = "<<sync_frame_msg.encoding;
   RCLCPP_INFO(this->get_logger(), "Recved frames in details '%s'", ss.str().c_str());
-  try{
+
+  frame_col_ = sync_frame_msg.width;
+  frame_row_ = sync_frame_msg.height;
+  frame_step_ = sync_frame_msg.step;
+  try {
     int sync_frame_width = sync_frame_msg.width;
     int sync_frame_height = sync_frame_msg.height;
     int step = sync_frame_msg.step;
@@ -182,7 +198,7 @@ void SyncFrameRecv::disparity_publisher_callback(const sensor_msgs::msg::Image &
     //cv::resize(right_frame_cvmat, outImg, cv::Size(), 1, 1);
     cv::imshow("right",right_frame_cvmat);
     //cv::imshow("view", );
-  }catch(...){
+  } catch (...) {
     RCLCPP_INFO(this->get_logger(), "Fail to copy sensor_msgs::msg::Image.data to cv::Mat ");
   }
   //publisher_l_ = this->create_publisher<sensor_msgs::msg::Image>("/lucid_camera/left_frame", pub_qos_);
