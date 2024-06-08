@@ -32,6 +32,10 @@
 #include <opencv2/highgui.hpp>
 #include <opencv2/core/cuda.hpp>
 #include <opencv2/cudastereo.hpp>
+#include <opencv2/calib3d.hpp>
+#include <opencv2/calib3d/calib3d.hpp>
+#include <opencv2/core.hpp>
+#include <opencv2/core/persistence.hpp>
 //typedef std::map<std::string, std::pair<double, rcl_interfaces::msg::ParameterDescriptor>> disparityParameters;
 
 namespace LUCIDStereo {
@@ -68,6 +72,22 @@ class SyncFrameRecv : public rclcpp::Node {
   this->declare_parameter<bool>("use_system_default_qos", false);
   this->declare_parameter<std::string>("intrincis_path", "../data/intrinsics.yml");
   this->declare_parameter<std::string>("extrincis_path", "../data/extrinsics.yml");
+  std::string intrinsic_filename = "./data/intrinsics.yml";
+  std::string extrinsic_filename = "./data/extrinsics.yml";
+  cv::FileStorage fs_in(intrinsic_filename, cv::FileStorage::READ);
+  if(!fs_in.isOpened()){
+    RCLCPP_ERROR(this->get_logger(), "Fail to open intrinsic file.");
+  }
+  fs_in["M1"] >> M1_;
+  fs_in["D1"] >> D1_;
+  fs_in["M2"] >> M2_;
+  fs_in["D2"] >> D2_;
+  cv::FileStorage fs_ex(extrinsic_filename, cv::FileStorage::READ);
+  if(!fs_ex.isOpened()){
+    RCLCPP_ERROR(this->get_logger(), "Fail to open extrinsic file.");
+  }
+  fs_ex["R"] >> R_;
+  fs_ex["T"] >> T_;
   // Declare parameters of disparityMap work
   //disparityParameters disparity_params;
   //add_params(disparity_params, "stereo_algorithm", "Stereo Algorithm: Block Matching (0) or Semi-Global Block Matching (1)", 0, 0, 1, 1);
@@ -90,9 +110,24 @@ class SyncFrameRecv : public rclcpp::Node {
   subscription_ = this->create_subscription<sensor_msgs::msg::Image>("/arena_camera_node/images", rclcpp::SensorDataQoS(), std::bind(&SyncFrameRecv::disparity_publisher_callback,
                                                                                                                                      this,
                                                                                                                                      _1));
+  cv::Mat left(sync_frame_height, (int)(step/2), CV_8UC1, cv::Scalar(0));
+  cv::Mat right(sync_frame_height, (int)(step/2), CV_8UC1, cv::Scalar(0));
+  for(int col=0; col<2448; col++){
+    for(int row=0; row<2048; row++){
+      right.at<uint8_t>(row, col) = *dual_frame_ptr(row, col*2);
+      left.at<uint8_t>(row, col) = *dual_frame.at<uint8_t>(row, col*2+1);
+    }
   }
   void rectify_frames(cv::Mat& left_frame, cv::Mat& right_frame, cv::Mat& rect_left_frame, cv::Mat& rect_right_frame, cv::Mat&& dual_frames);
+  ~SyncFrameRecv(){
+    delete [] dual_frame_ptr_;
+  }
  private:
+  unsigned char* dual_frame_ptr_ = new unsigned char[4896*2048];
+  cv::Mat M1_, M2_, D1_, D2_;
+  cv::Rect roi1_, roi2_;
+  cv::Mat R_, T_, R1_, P1_, R2_, P2_, Q_;
+  cv::Mat map11_, map12_, map21_, map22_;
   std::string sub_topic_name_ = "/arena_camera_node/images";
   rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr subscription_;
   rclcpp::SensorDataQoS pub_qos_;
@@ -131,6 +166,7 @@ void SyncFrameRecv::disparity_publisher_callback(const sensor_msgs::msg::Image &
     cv::Mat outImg;
     cv::Mat dual_frame(sync_frame_height, step, CV_8UC1, cv::Scalar(0));
     std::memcpy(dual_frame.ptr<uchar>(0), &sync_frame_msg.data[0], step*sync_frame_height);
+    std::memcpy(dual_frame_ptr_, &sync_frame_msg.data[0], step*sync_frame_height);
     //cv::resize(dual_frame, outImg, cv::Size(), 0.5, 0.5);
     //cv::imshow("view", dual_frame);
     cv::Mat left_frame_cvmat(sync_frame_height, (int)(step/2), CV_8UC1, cv::Scalar(0));
@@ -175,8 +211,11 @@ void SyncFrameRecv::rectify_frames(cv::Mat& left_frame,
       right_frame.at<uint8_t>(row, col) = dual_frame.at<uint8_t>(row, col*2);
       left_frame.at<uint8_t>(row, col) = dual_frame.at<uint8_t>(row, col*2+1);
     }
-  rect_left_frame = left_frame;
-  rect_right_frame = right_frame;
+    //cv::stereoRectify(M1_, D1_, M2_, D2_, left_frame.size(), R_, T_, R1_, R2_, P1_, P2_, Q_, cv::CALIB_ZERO_DISPARITY, -1, right_frame.size(), &roi1_, &roi2_);
+    //cv::initUndistortRectifyMap(M1_, D1_, R1_, P1_, left_frame.size(), CV_16SC2, map11_, map12_);
+    //cv::initUndistortRectifyMap(M2, D2, R2, P2, right_frame.size(), CV_16SC2, map21, map22);
+    //cv::remap(left_frame, left_frame_rect, map11, map12, cv::INTER_LINEAR);
+    //cv::remap(right_frame, right_frame_rect, map21, map22, cv::INTER_LINEAR);
   }
 }
 } // namespace LUCIDStereo
