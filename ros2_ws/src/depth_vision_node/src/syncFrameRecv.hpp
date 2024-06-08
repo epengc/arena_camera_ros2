@@ -140,6 +140,9 @@ class SyncFrameRecv : public rclcpp::Node {
   int frame_col_;
   int frame_row_;
   int frame_step_;
+  cv::cuda::GpuMat d_leftFrame_;
+  cv::cuda::GpuMat d_rightFrame_;
+  cv::cuda::GpuMat d_diparity_;
   std::string sub_topic_name_ = "/arena_camera_node/images";
   rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr subscription_;
   rclcpp::SensorDataQoS pub_qos_;
