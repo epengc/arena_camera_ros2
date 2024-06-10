@@ -58,6 +58,62 @@ namespace LUCIDStereo {
 //  parameters[name] = std::make_pair(default_value, descriptor);
 //}
 
+class StereoSingleGpu{
+public:
+  explicit StereoSingleGpu(int deviceId = 0);
+  ~StereoSingleGpu();
+  void compute(const cv::Mat& left_frame,
+               const cv::Mat& right_frame,
+               cv::Mat& disparity);
+  cv::Ptr<cv::cuda::StereoSGM> d_alg_;
+  int get_minDisparity(){return minDisparity_};
+  int get_numDisparities(){return numDisparities_};
+private:
+  int deviceId_;
+  cv::cuda::GpuMat d_leftFrame_;
+  cv::cuda::GpuMat d_rightFrame_;
+  cv::cuda::GpuMat d_disparity_;
+  int numDisparities_ = 8;
+  int blocksize_ = 0;
+  int P1_ = 8;
+  int P2_ = 8;
+  int preFilterCap_ = 0;
+  int minDisparity_ = 360;
+  int uniquenessRatio_ = 0;
+  int speckleRange_ = 0;
+  int speckleWindowSize_ = 0;
+  int disp12MaxDiff_ = 0;
+  int dispType_ = CV_16S;
+
+};
+
+
+  StereoSingleGpu::StereoSingleGpu(int deviceId):deviceId_(deviceId){
+    cv::cuda::setDevice(deviceId_);
+    d_alg_ = cv::cuda::createStereoSGM();
+  }
+
+
+  StereoSingleGpu::~StereoSingleGpu(){
+    cv::cuda::setDevice(deviceId_);
+    d_leftFrame_.release();
+    d_rightFrame_.release();
+    d_disparity_.release();
+    d_alg_.release();
+  }
+
+
+  void StereoSingleGpu::compute(const cv::Mat& left_frame,
+                                const cv::Mat& right_frame,
+                                cv::Mat& disparity){
+    cv::cuda::setDevice(deviceId_);
+    d_leftFrame_.upload(left_frame);
+    d_rightFrame_.upload(right_frame);
+    d_alg_->compute(d_leftFrame_, d_rightFrame, d_diparity);
+    d_disparity_.download(disparity);
+  }
+
+
 class SyncFrameRecv : public rclcpp::Node {
  public:
   explicit SyncFrameRecv() : Node("SyncFrameRecv"){
@@ -110,29 +166,14 @@ class SyncFrameRecv : public rclcpp::Node {
    subscription_ = this->create_subscription<sensor_msgs::msg::Image>("/arena_camera_node/images", rclcpp::SensorDataQoS(), std::bind(&SyncFrameRecv::disparity_publisher_callback,
                                                                                                                                       this,
                                                                                                                                       _1));
-   //int frame_step = (int)(frame_step_/2);
-   //cv::Mat left(frame_row_, frame_step, CV_8UC1, cv::Scalar(0));
-   //cv::Mat right(frame_row_, frame_step, CV_8UC1, cv::Scalar(0));
-   //for(int col=0; col<frame_step; col++){
-   //  for(int row=0; row<frame_row_; row++){
-   //    right.at<uint8_t>(row, col) = dual_frame_ptr_[row*frame_step+col*2];
-   //    left.at<uint8_t>(row, col) = dual_frame_ptr_[row*frame_step+col*2+1];
-   //  }
-   //}
-   //cv::Mat rect_left, rect_right;
-   //cv::stereoRectify(M1_, D1_, M2_, D2_, left.size(), R_, T_, R1_, R2_, P1_, P2_, Q_, cv::CALIB_ZERO_DISPARITY, -1, right.size(), &roi1_, &roi2_);
-   //cv::initUndistortRectifyMap(M1_, D1_, R1_, P1_, left.size(), CV_16SC2, map11_, map12_);
-   //cv::initUndistortRectifyMap(M2_, D2_, R2_, P2_, right.size(), CV_16SC2, map21_, map22_);
-   //cv::remap(left, rect_left, map11_, map12_, cv::INTER_LINEAR);
-   //cv::remap(right, rect_right, map21_, map22_, cv::INTER_LINEAR);
+
   }
 
-  void rectify_frames(cv::Mat& left_frame, cv::Mat& right_frame, cv::Mat& rect_left_frame, cv::Mat& rect_right_frame, cv::Mat&& dual_frames);
+  void rectifyFrames(cv::Mat& left_frame, cv::Mat& right_frame, cv::Mat& rect_left_frame, cv::Mat& rect_right_frame, cv::Mat&& dual_frames);
   ~SyncFrameRecv(){
-    delete [] dual_frame_ptr_;
   }
+
  private:
-  unsigned char* dual_frame_ptr_ = new unsigned char[4896*2048];
   cv::Mat M1_, M2_, D1_, D2_;
   cv::Rect roi1_, roi2_;
   cv::Mat R_, T_, R1_, P1_, R2_, P2_, Q_;
@@ -140,9 +181,7 @@ class SyncFrameRecv : public rclcpp::Node {
   int frame_col_;
   int frame_row_;
   int frame_step_;
-  cv::cuda::GpuMat d_leftFrame_;
-  cv::cuda::GpuMat d_rightFrame_;
-  cv::cuda::GpuMat d_diparity_;
+  StereoSingleGpu gpuAlg_(0);
   std::string sub_topic_name_ = "/arena_camera_node/images";
   rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr subscription_;
   rclcpp::SensorDataQoS pub_qos_;
@@ -151,92 +190,101 @@ class SyncFrameRecv : public rclcpp::Node {
 };
 
 
-void SyncFrameRecv::disparity_publisher_callback(const sensor_msgs::msg::Image &sync_frame_msg) {
-  // RCLCPP_INFO(get_logger(), "subscription is done");
-  // get sync_frame from ros2 topic and convert them to opencv mat; Format of
-  // sync_frame is 4896x2048
-  // const cv::Mat_<uint8_t> sync_frame_cv_mat = cv_bridge::toCvCopy(sync_frame_msg, sensor_msgs::image_encodings::MONO8)->image;
-  // get left and right frame from ros2 topic
-  // cv::Mat rect_left_frame_cvmat, rect_right_frame_cvmat;
-  //int width = sync_frame_msg.width;
-  //int height = sync_frame_msg.height;
-  //std::vector<int> compression_params;
-  //compression_params.push_back(cv::IMWRITE_PNG_COMPRESSION);
-  //compression_params.push_back(9);
-  //cv::imwrite("./samples_left.png", left_frame_cvmat, compression_params);
-  //cv::imwrite("./samples_right.png", right_frame_cvmat, compression_params);
-  //std_msgs::msg::Header h = sync_frame_msg.header;
-  //std::stringstream message;
-  //message<<h.stamp.sec;
-  std::stringstream ss;
-  ss<<" width = "<< sync_frame_msg.width;
-  ss<<" height = "<< sync_frame_msg.height; 
-  ss<<" step = "<< sync_frame_msg.step; 
-  ss<<" encoding = "<<sync_frame_msg.encoding;
-  RCLCPP_INFO(this->get_logger(), "Recved frames in details '%s'", ss.str().c_str());
-
-  frame_col_ = sync_frame_msg.width;
-  frame_row_ = sync_frame_msg.height;
-  frame_step_ = sync_frame_msg.step;
-  try {
-    int sync_frame_width = sync_frame_msg.width;
-    int sync_frame_height = sync_frame_msg.height;
-    int step = sync_frame_msg.step;
-    cv::Mat outImg;
-    cv::Mat dual_frame(sync_frame_height, step, CV_8UC1, cv::Scalar(0));
-    std::memcpy(dual_frame.ptr<uchar>(0), &sync_frame_msg.data[0], step*sync_frame_height);
-    std::memcpy(dual_frame_ptr_, &sync_frame_msg.data[0], step*sync_frame_height);
-    //cv::resize(dual_frame, outImg, cv::Size(), 0.5, 0.5);
-    //cv::imshow("view", dual_frame);
-    cv::Mat left_frame_cvmat(sync_frame_height, (int)(step/2), CV_8UC1, cv::Scalar(0));
-    cv::Mat right_frame_cvmat(sync_frame_height, (int)(step/2), CV_8UC1, cv::Scalar(0));
-    cv::Mat rect_left_frame_cvmat, rect_right_frame_cvmat;
-    rectify_frames(left_frame_cvmat,
-                   right_frame_cvmat,
-                   rect_left_frame_cvmat,
-                   rect_right_frame_cvmat,
-                   std::move(dual_frame));
-    //cv::resize(left_frame_cvmat, outImg, cv::Size(), 1, 1);
-    cv::imshow("left", rect_left_frame_cvmat);
-    //cv::resize(right_frame_cvmat, outImg, cv::Size(), 1, 1);
-    cv::imshow("right",rect_right_frame_cvmat);
-    //cv::imshow("view", );
-  } catch (...) {
-    RCLCPP_INFO(this->get_logger(), "Fail to copy sensor_msgs::msg::Image.data to cv::Mat ");
-  }
-  //publisher_l_ = this->create_publisher<sensor_msgs::msg::Image>("/lucid_camera/left_frame", pub_qos_);
-  //publisher_r_ = this->create_publisher<sensor_msgs::msg::Image>("/lucid_camera/right_frame", pub_qos_);
-  //sensor_msgs::msg::Image::SharedPtr msg_l = cv_bridge::CvImage(std_msgs::msg::Header(), "bgr8", left_frame_cvmat).toImageMsg();
-  //sensor_msgs::msg::Image::SharedPtr msg_r = cv_bridge::CvImage(std_msgs::msg::Header(), "bgr8", right_frame_cvmat).toImageMsg();
-  //publisher_l_->publish(std::move(*msg_l));
-  //publisher_r_->publish(std::move(*msg_r));
-  //cv::namedWindow("FrameDisplay", cv::WINDOW_NORMAL);
-  //cv::resizeWindow("FrameDisplay", 600, 600);
-  //cv::imshow("FrameDisplay", left_frame_cvmat);
-  //auto disp_msg = std::make_shared<stereo_msgs::msg::DisparityImage>();
-  //disp_msg->header = l_image_msg->header;
-  //disp_msg->image.header = l_image_msg->header;
-}
-
-void SyncFrameRecv::rectify_frames(cv::Mat& left_frame,
-                                   cv::Mat& right_frame,
-                                   cv::Mat& rect_left_frame,
-                                   cv::Mat& rect_right_frame,
-                                   cv::Mat&& dual_frame){
-  int width = dual_frame.cols;
-  int height = dual_frame.rows;
-  for(int col=0; col<(int)(width/2); col++){
-    for(int row=0; row<height; row++){
-      right_frame.at<uint8_t>(row, col) = dual_frame.at<uint8_t>(row, col*2);
-      left_frame.at<uint8_t>(row, col) = dual_frame.at<uint8_t>(row, col*2+1);
+  void SyncFrameRecv::disparity_publisher_callback(const sensor_msgs::msg::Image &sync_frame_msg) {
+    // RCLCPP_INFO(get_logger(), "subscription is done");
+    // get sync_frame from ros2 topic and convert them to opencv mat; Format of
+    // sync_frame is 4896x2048
+    // const cv::Mat_<uint8_t> sync_frame_cv_mat = cv_bridge::toCvCopy(sync_frame_msg, sensor_msgs::image_encodings::MONO8)->image;
+    // get left and right frame from ros2 topic
+    // cv::Mat rect_left_frame_cvmat, rect_right_frame_cvmat;
+    //int width = sync_frame_msg.width;
+    //int height = sync_frame_msg.height;
+    //std::vector<int> compression_params;
+    //compression_params.push_back(cv::IMWRITE_PNG_COMPRESSION);
+    //compression_params.push_back(9);
+    //cv::imwrite("./samples_left.png", left_frame_cvmat, compression_params);
+    //cv::imwrite("./samples_right.png", right_frame_cvmat, compression_params);
+    //std_msgs::msg::Header h = sync_frame_msg.header;
+    //std::stringstream message;
+    //message<<h.stamp.sec;
+    std::stringstream ss;
+    ss<<" width = "<< sync_frame_msg.width;
+    ss<<" height = "<< sync_frame_msg.height; 
+    ss<<" step = "<< sync_frame_msg.step; 
+    ss<<" encoding = "<<sync_frame_msg.encoding;
+    RCLCPP_INFO(this->get_logger(), "Recved frames in details '%s'", ss.str().c_str());
+  
+    frame_col_ = sync_frame_msg.width;
+    frame_row_ = sync_frame_msg.height;
+    frame_step_ = sync_frame_msg.step;
+    try {
+      int sync_frame_width = sync_frame_msg.width;
+      int sync_frame_height = sync_frame_msg.height;
+      int step = sync_frame_msg.step;
+      cv::Mat outImg;
+      cv::Mat dual_frame(sync_frame_height, step, CV_8UC1, cv::Scalar(0));
+      std::memcpy(dual_frame.ptr<uchar>(0), &sync_frame_msg.data[0], step*sync_frame_height);
+      //cv::resize(dual_frame, outImg, cv::Size(), 0.5, 0.5);
+      //cv::imshow("view", dual_frame);
+      cv::Mat left_frame_cvmat(sync_frame_height, (int)(step/2), CV_8UC1, cv::Scalar(0));
+      cv::Mat right_frame_cvmat(sync_frame_height, (int)(step/2), CV_8UC1, cv::Scalar(0));
+      cv::Mat rect_left_frame_cvmat, rect_right_frame_cvmat;
+      rectifyFrames(left_frame_cvmat,
+                    right_frame_cvmat,
+                    rect_left_frame_cvmat,
+                    rect_right_frame_cvmat,
+                    std::move(dual_frame));
+      //cv::resize(left_frame_cvmat, outImg, cv::Size(), 1, 1);
+      cv::imshow("left", rect_left_frame_cvmat);
+      //cv::resize(right_frame_cvmat, outImg, cv::Size(), 1, 1);
+      cv::imshow("right",rect_right_frame_cvmat);
+      //cv::imshow("view", );
+      cv::Mat disp, disparity;
+      gpuAlg_.compute(rect_left_frame_cvmat, rect_right_frame_cvmat, disp);
+      disp.convertTo(disparity, CV_32F, 1.0);
+      disparity = (disparity/16.0f-(float)gpuAlg_.get_minDisparity())/((float)gpuAlg_.get_numDisparities());
+      cv::imshow("disparity", disparity);
+    } catch (...) {
+      RCLCPP_INFO(this->get_logger(), "Fail to copy sensor_msgs::msg::Image.data to cv::Mat ");
     }
+    //publisher_l_ = this->create_publisher<sensor_msgs::msg::Image>("/lucid_camera/left_frame", pub_qos_);
+    //publisher_r_ = this->create_publisher<sensor_msgs::msg::Image>("/lucid_camera/right_frame", pub_qos_);
+    //sensor_msgs::msg::Image::SharedPtr msg_l = cv_bridge::CvImage(std_msgs::msg::Header(), "bgr8", left_frame_cvmat).toImageMsg();
+    //sensor_msgs::msg::Image::SharedPtr msg_r = cv_bridge::CvImage(std_msgs::msg::Header(), "bgr8", right_frame_cvmat).toImageMsg();
+    //publisher_l_->publish(std::move(*msg_l));
+    //publisher_r_->publish(std::move(*msg_r));
+    //cv::namedWindow("FrameDisplay", cv::WINDOW_NORMAL);
+    //cv::resizeWindow("FrameDisplay", 600, 600);
+    //cv::imshow("FrameDisplay", left_frame_cvmat);
+    //auto disp_msg = std::make_shared<stereo_msgs::msg::DisparityImage>();
+    //disp_msg->header = l_image_msg->header;
+    //disp_msg->image.header = l_image_msg->header;
   }
-  cv::stereoRectify(M1_, D1_, M2_, D2_, left_frame.size(), R_, T_, R1_, R2_, P1_, P2_, Q_, cv::CALIB_ZERO_DISPARITY, -1, right_frame.size(), &roi1_, &roi2_);
-  cv::initUndistortRectifyMap(M1_, D1_, R1_, P1_, left_frame.size(), CV_16SC2, map11_, map12_);
-  cv::initUndistortRectifyMap(M2_, D2_, R2_, P2_, right_frame.size(), CV_16SC2, map21_, map22_);
-  cv::remap(left_frame, rect_left_frame, map11_, map12_, cv::INTER_LINEAR);
-  cv::remap(right_frame, rect_right_frame, map21_, map22_, cv::INTER_LINEAR);
-}
+
+
+  void SyncFrameRecv::rectifyFrames(cv::Mat& left_frame,
+                                    cv::Mat& right_frame,
+                                    cv::Mat& rect_left_frame,
+                                    cv::Mat& rect_right_frame,
+                                    cv::Mat&& dual_frame){
+    int width = dual_frame.cols;
+    int height = dual_frame.rows;
+    for(int col=0; col<(int)(width/2); col++){
+      for(int row=0; row<height; row++){
+        right_frame.at<uint8_t>(row, col) = dual_frame.at<uint8_t>(row, col*2);
+        left_frame.at<uint8_t>(row, col) = dual_frame.at<uint8_t>(row, col*2+1);
+      }
+    }
+    cv::stereoRectify(M1_, D1_, M2_, D2_, left_frame.size(), R_, T_, R1_, R2_, P1_, P2_, Q_, cv::CALIB_ZERO_DISPARITY, -1, right_frame.size(), &roi1_, &roi2_);
+    cv::initUndistortRectifyMap(M1_, D1_, R1_, P1_, left_frame.size(), CV_16SC2, map11_, map12_);
+    cv::initUndistortRectifyMap(M2_, D2_, R2_, P2_, right_frame.size(), CV_16SC2, map21_, map22_);
+    cv::remap(left_frame, rect_left_frame, map11_, map12_, cv::INTER_LINEAR);
+    cv::remap(right_frame, rect_right_frame, map21_, map22_, cv::INTER_LINEAR);
+  }
+
+
+
+
 } // namespace LUCIDStereo
 
 #endif
