@@ -66,8 +66,8 @@ public:
                const cv::Mat& right_frame,
                cv::Mat& disparity);
   cv::Ptr<cv::cuda::StereoSGM> d_alg_;
-  int get_minDisparity(){return minDisparity_};
-  int get_numDisparities(){return numDisparities_};
+  //int get_minDisparity(){return minDisparity_};
+  //int get_numDisparities(){return numDisparities_};
 private:
   int deviceId_;
   cv::cuda::GpuMat d_leftFrame_;
@@ -106,13 +106,16 @@ private:
   void StereoSingleGpu::compute(const cv::Mat& left_frame,
                                 const cv::Mat& right_frame,
                                 cv::Mat& disparity){
+    //RCLCPP_INFO(this->get_logger(), " start disparityMap comput ");
     cv::cuda::setDevice(deviceId_);
     d_leftFrame_.upload(left_frame);
     d_rightFrame_.upload(right_frame);
-    d_alg_->compute(d_leftFrame_, d_rightFrame, d_diparity);
+    d_alg_->compute(d_leftFrame_, d_rightFrame_, d_disparity_);
     d_disparity_.download(disparity);
   }
 
+
+StereoSingleGpu gpuAlg(0);
 
 class SyncFrameRecv : public rclcpp::Node {
  public:
@@ -181,7 +184,6 @@ class SyncFrameRecv : public rclcpp::Node {
   int frame_col_;
   int frame_row_;
   int frame_step_;
-  StereoSingleGpu gpuAlg_(0);
   std::string sub_topic_name_ = "/arena_camera_node/images";
   rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr subscription_;
   rclcpp::SensorDataQoS pub_qos_;
@@ -217,7 +219,7 @@ class SyncFrameRecv : public rclcpp::Node {
     frame_col_ = sync_frame_msg.width;
     frame_row_ = sync_frame_msg.height;
     frame_step_ = sync_frame_msg.step;
-    try {
+    //try {
       int sync_frame_width = sync_frame_msg.width;
       int sync_frame_height = sync_frame_msg.height;
       int step = sync_frame_msg.step;
@@ -240,13 +242,19 @@ class SyncFrameRecv : public rclcpp::Node {
       cv::imshow("right",rect_right_frame_cvmat);
       //cv::imshow("view", );
       cv::Mat disp, disparity;
-      gpuAlg_.compute(rect_left_frame_cvmat, rect_right_frame_cvmat, disp);
+      cv::Mat left = cv::imread("./data/RectLeft.tiff", cv::IMREAD_GRAYSCALE);
+      cv::Mat right = cv::imread("./data/RectRight.tiff", cv::IMREAD_GRAYSCALE);
+      std::cout<<"left frame rows = "<<rect_left_frame_cvmat.rows<<std::endl;
+      std::cout<<"left frame cols = "<<rect_left_frame_cvmat.cols<<std::endl;
+      std::cout<<"right frame rows = "<<rect_right_frame_cvmat.rows<<std::endl;
+      std::cout<<"right frame rows = "<<rect_right_frame_cvmat.cols<<std::endl;
+      gpuAlg.compute(left, right, disp);
       disp.convertTo(disparity, CV_32F, 1.0);
-      disparity = (disparity/16.0f-(float)gpuAlg_.get_minDisparity())/((float)gpuAlg_.get_numDisparities());
+      disparity = (disparity/16.0f-(float)80)/(float)8;
       cv::imshow("disparity", disparity);
-    } catch (...) {
-      RCLCPP_INFO(this->get_logger(), "Fail to copy sensor_msgs::msg::Image.data to cv::Mat ");
-    }
+      //} catch (...) {
+      //RCLCPP_INFO(this->get_logger(), "Fail to copy sensor_msgs::msg::Image.data to cv::Mat ");
+      //}
     //publisher_l_ = this->create_publisher<sensor_msgs::msg::Image>("/lucid_camera/left_frame", pub_qos_);
     //publisher_r_ = this->create_publisher<sensor_msgs::msg::Image>("/lucid_camera/right_frame", pub_qos_);
     //sensor_msgs::msg::Image::SharedPtr msg_l = cv_bridge::CvImage(std_msgs::msg::Header(), "bgr8", left_frame_cvmat).toImageMsg();
