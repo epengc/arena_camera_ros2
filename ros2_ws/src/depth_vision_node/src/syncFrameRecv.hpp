@@ -242,12 +242,15 @@ class SyncFrameRecv : public rclcpp::Node {
       cv::imshow("right",rect_right_frame_cvmat);
       //cv::imshow("view", );
       cv::Mat disp, disparity;
-      cv::Mat left = cv::imread("./data/RectLeft.tiff", cv::IMREAD_GRAYSCALE);
-      cv::Mat right = cv::imread("./data/RectRight.tiff", cv::IMREAD_GRAYSCALE);
+      //cv::Mat left = cv::imread("./data/RectLeft.tiff", cv::IMREAD_GRAYSCALE);
+      //cv::Mat right = cv::imread("./data/RectRight.tiff", cv::IMREAD_GRAYSCALE);
+      int w_test = 410;
+      cv::Mat left = rect_left_frame_cvmat(cv::Rect(w_test, 0, rect_left_frame_cvmat.cols-w_test, rect_left_frame_cvmat.rows));
+      cv::Mat right = rect_right_frame_cvmat(cv::Rect(w_test, 0, rect_right_frame_cvmat.cols-w_test, rect_right_frame_cvmat.rows));
       std::cout<<"left frame rows = "<<rect_left_frame_cvmat.rows<<std::endl;
-      std::cout<<"left frame cols = "<<rect_left_frame_cvmat.cols<<std::endl;
+      std::cout<<"left frame cols = "<<rect_left_frame_cvmat.cols-w_test<<std::endl;
       std::cout<<"right frame rows = "<<rect_right_frame_cvmat.rows<<std::endl;
-      std::cout<<"right frame rows = "<<rect_right_frame_cvmat.cols<<std::endl;
+      std::cout<<"right frame rows = "<<rect_right_frame_cvmat.cols-w_test<<std::endl;
       gpuAlg.compute(left, right, disp);
       disp.convertTo(disparity, CV_32F, 1.0);
       disparity = (disparity/16.0f-(float)80)/(float)8;
@@ -279,8 +282,8 @@ class SyncFrameRecv : public rclcpp::Node {
     int height = dual_frame.rows;
     for(int col=0; col<(int)(width/2); col++){
       for(int row=0; row<height; row++){
-        right_frame.at<uint8_t>(row, col) = dual_frame.at<uint8_t>(row, col*2);
-        left_frame.at<uint8_t>(row, col) = dual_frame.at<uint8_t>(row, col*2+1);
+        left_frame.at<uint8_t>(row, col) = dual_frame.at<uint8_t>(row, col*2);
+        right_frame.at<uint8_t>(row, col) = dual_frame.at<uint8_t>(row, col*2+1);
       }
     }
     cv::stereoRectify(M1_, D1_, M2_, D2_, left_frame.size(), R_, T_, R1_, R2_, P1_, P2_, Q_, cv::CALIB_ZERO_DISPARITY, -1, right_frame.size(), &roi1_, &roi2_);
