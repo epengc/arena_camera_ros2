@@ -490,10 +490,10 @@ void ArenaCameraNode::set_nodes_pixelformat_()
     try {
       //Arena::SetNodeValue<GenICam::gcstring>(nodemap, "PixelFormat",
       //                                       pixelformat_pfnc_.c_str());
+      //log_info(std::string("\tPixelFormat set to ") + pixelformat_pfnc_);
       Arena::SetNodeValue<GenICam::gcstring>(nodemap, "PixelFormat",
                                              "DualMono8");
-      log_info(std::string("\tPixelFormat set to ") + pixelformat_pfnc_);
-
+      log_info(std::string("\tPixelFormat set to ") + "DualMono8");
     } catch (GenICam::GenericException& e) {
       // TODO
       // an rcl expectation might be expected

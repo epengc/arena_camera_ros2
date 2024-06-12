@@ -57,34 +57,43 @@ namespace LUCIDStereo {
 //  descriptor.floating_point_range = {floating_point_range};
 //  parameters[name] = std::make_pair(default_value, descriptor);
 //}
-
-class StereoSingleGpu{
-public:
-  explicit StereoSingleGpu(int deviceId = 0);
-  ~StereoSingleGpu();
-  void compute(const cv::Mat& left_frame,
-               const cv::Mat& right_frame,
-               cv::Mat& disparity);
-  cv::Ptr<cv::cuda::StereoSGM> d_alg_;
-  //int get_minDisparity(){return minDisparity_};
-  //int get_numDisparities(){return numDisparities_};
-private:
-  int deviceId_;
-  cv::cuda::GpuMat d_leftFrame_;
-  cv::cuda::GpuMat d_rightFrame_;
-  cv::cuda::GpuMat d_disparity_;
-  int numDisparities_ = 8;
-  int blocksize_ = 0;
-  int P1_ = 8;
-  int P2_ = 8;
-  int preFilterCap_ = 0;
-  int minDisparity_ = 360;
-  int uniquenessRatio_ = 0;
-  int speckleRange_ = 0;
-  int speckleWindowSize_ = 0;
-  int disp12MaxDiff_ = 0;
-  int dispType_ = CV_16S;
-
+int numDisparities = 4;
+int blockSize = 0;
+int P1 = 150;
+int P2 = 180;
+int preFilterCap = 0;
+int minDisparity = 184;
+int uniquenessRatio = 0;
+int speckleRange = 0;
+int speckleWindowSize = 0;
+int disp12MaxDiff = 0;
+  bool on_flag = true;
+  class StereoSingleGpu{
+  public:
+    explicit StereoSingleGpu(int deviceId = 0);
+    ~StereoSingleGpu();
+    void compute(const cv::Mat& left_frame,
+                 const cv::Mat& right_frame,
+                 cv::Mat& disparity);
+    cv::Ptr<cv::cuda::StereoSGM> d_alg_;
+    //int get_minDisparity(){return minDisparity_};
+    //int get_numDisparities(){return numDisparities_};
+  private:
+    int deviceId_;
+    cv::cuda::GpuMat d_leftFrame_;
+    cv::cuda::GpuMat d_rightFrame_;
+    cv::cuda::GpuMat d_disparity_;
+    int numDisparities = 8;
+    int blockSize = 0;
+    int P1 = 8;
+    int P2 = 8;
+    int preFilterCap = 0;
+    int minDisparity = 184;
+    int uniquenessRatio = 0;
+    int speckleRange = 0;
+    int speckleWindowSize = 0;
+    int disp12MaxDiff = 0;
+    int dispType_ = CV_16S;
 };
 
 
@@ -116,6 +125,50 @@ private:
 
 
 StereoSingleGpu gpuAlg(0);
+
+  static void on_trackbar1(int, void*){
+    gpuAlg.d_alg_->setNumDisparities(numDisparities*16);
+    numDisparities = numDisparities*16;
+  }
+
+  static void on_trackbar2(int, void*){
+    gpuAlg.d_alg_->setBlockSize(blockSize*2+5);
+    blockSize = blockSize*2+5;
+  }
+
+  static void on_trackbar3(int, void*){
+    gpuAlg.d_alg_->setP1(P1);
+  }
+
+  static void on_trackbar4(int, void*){
+    gpuAlg.d_alg_->setP2(P2);
+  }
+
+  static void on_trackbar5(int, void*){
+    gpuAlg.d_alg_->setPreFilterCap(preFilterCap);
+  }
+
+  static void on_trackbar6(int, void*){
+    gpuAlg.d_alg_->setMinDisparity(minDisparity);
+  }
+
+  static void on_trackbar7(int, void*){
+    gpuAlg.d_alg_->setUniquenessRatio(uniquenessRatio);
+  }
+
+  static void on_trackbar8(int, void*){
+    gpuAlg.d_alg_->setSpeckleRange(speckleRange);
+  }
+
+  static void on_trackbar9(int, void*){
+    gpuAlg.d_alg_->setSpeckleWindowSize(speckleWindowSize*2);
+    speckleWindowSize = speckleWindowSize*2;
+  }
+
+  static void on_trackbar10(int, void*){
+    gpuAlg.d_alg_->setDisp12MaxDiff(disp12MaxDiff);
+  }
+
 
 class SyncFrameRecv : public rclcpp::Node {
  public:
@@ -166,6 +219,16 @@ class SyncFrameRecv : public rclcpp::Node {
    //// Declaring parameters triggers the previously registered callback
    //this->declare_parameter<disparityParameters>("disparity_params", disparity_params);
    // For avoiding incompatible QoSInitialization by using rclcpp::SensorDataQoS()
+   cv::createTrackbar("numDisparities",    "disparity", &numDisparities,    32,  on_trackbar1);
+   cv::createTrackbar("blockSize",         "disparity", &blockSize,         50,  on_trackbar2);
+   cv::createTrackbar("P1",                "disparity", &P1,                150, on_trackbar3);
+   cv::createTrackbar("P2",                "disparity", &P2,                150, on_trackbar4);
+   cv::createTrackbar("preFilterCap",      "disparity", &preFilterCap,      62,  on_trackbar5);
+   cv::createTrackbar("minDisparity",      "disparity", &minDisparity,      400, on_trackbar6);
+   cv::createTrackbar("uniquenessRatio",   "disparity", &uniquenessRatio,   100, on_trackbar7);
+   cv::createTrackbar("speckleRange",      "disparity", &speckleRange,      100, on_trackbar8);
+   cv::createTrackbar("speckleWindowSize", "disparity", &speckleWindowSize, 25,  on_trackbar9);
+   cv::createTrackbar("dips12MaxDiff",     "disparity", &disp12MaxDiff,     25,  on_trackbar10);
    subscription_ = this->create_subscription<sensor_msgs::msg::Image>("/arena_camera_node/images", rclcpp::SensorDataQoS(), std::bind(&SyncFrameRecv::disparity_publisher_callback,
                                                                                                                                       this,
                                                                                                                                       _1));
@@ -238,22 +301,45 @@ class SyncFrameRecv : public rclcpp::Node {
                     std::move(dual_frame));
       //cv::resize(left_frame_cvmat, outImg, cv::Size(), 1, 1);
       cv::imshow("left", rect_left_frame_cvmat);
+      if(on_flag){
+      std::vector<int> compression_params;
+      compression_params.push_back(cv::IMWRITE_PNG_COMPRESSION);
+      compression_params.push_back(9);
+      cv::imwrite("./samples_left.png", left_frame_cvmat, compression_params);
+      cv::imwrite("./samples_right.png", right_frame_cvmat, compression_params);
+      on_flag = false;
+      }
       //cv::resize(right_frame_cvmat, outImg, cv::Size(), 1, 1);
       cv::imshow("right",rect_right_frame_cvmat);
       //cv::imshow("view", );
       cv::Mat disp, disparity;
-      //cv::Mat left = cv::imread("./data/RectLeft.tiff", cv::IMREAD_GRAYSCALE);
-      //cv::Mat right = cv::imread("./data/RectRight.tiff", cv::IMREAD_GRAYSCALE);
       int w_test = 410;
-      cv::Mat left = rect_left_frame_cvmat(cv::Rect(w_test, 0, rect_left_frame_cvmat.cols-w_test, rect_left_frame_cvmat.rows));
-      cv::Mat right = rect_right_frame_cvmat(cv::Rect(w_test, 0, rect_right_frame_cvmat.cols-w_test, rect_right_frame_cvmat.rows));
-      std::cout<<"left frame rows = "<<rect_left_frame_cvmat.rows<<std::endl;
-      std::cout<<"left frame cols = "<<rect_left_frame_cvmat.cols-w_test<<std::endl;
-      std::cout<<"right frame rows = "<<rect_right_frame_cvmat.rows<<std::endl;
-      std::cout<<"right frame rows = "<<rect_right_frame_cvmat.cols-w_test<<std::endl;
-      gpuAlg.compute(left, right, disp);
+      //cv::Mat left = rect_left_frame_cvmat(cv::Rect(w_test, 0, rect_left_frame_cvmat.cols-w_test, rect_left_frame_cvmat.rows));
+      //cv::Mat right = rect_right_frame_cvmat(cv::Rect(w_test, 0, rect_right_frame_cvmat.cols-w_test, rect_right_frame_cvmat.rows));
+      cv::Mat left = cv::imread("./data/rect_left.tiff", cv::IMREAD_GRAYSCALE);
+      cv::Mat right = cv::imread("./data/rect_right.tiff", cv::IMREAD_GRAYSCALE);
+      //std::cout<<"left frame rows = "<<rect_left_frame_cvmat.rows<<std::endl;
+      //std::cout<<"left frame cols = "<<rect_left_frame_cvmat.cols-w_test<<std::endl;
+      //std::cout<<"right frame rows = "<<rect_right_frame_cvmat.rows<<std::endl;
+      //std::cout<<"right frame rows = "<<rect_right_frame_cvmat.cols-w_test<<std::endl;
+      cv::Mat left_test = left(cv::Rect(w_test, 0, left.cols-w_test, left.rows));
+      cv::Mat right_test = right(cv::Rect(w_test, 0, right.cols-w_test, right.rows));
+      gpuAlg.d_alg_->setNumDisparities(numDisparities*16);
+      gpuAlg.d_alg_->setBlockSize(blockSize*2+5);
+      gpuAlg.d_alg_->setP1(P1);
+      gpuAlg.d_alg_->setP2(P2);
+      gpuAlg.d_alg_->setPreFilterCap(preFilterCap);
+      gpuAlg.d_alg_->setMinDisparity(minDisparity);
+      gpuAlg.d_alg_->setUniquenessRatio(uniquenessRatio);
+      gpuAlg.d_alg_->setSpeckleRange(speckleRange);
+      gpuAlg.d_alg_->setSpeckleWindowSize(speckleWindowSize*2);
+      gpuAlg.d_alg_->setDisp12MaxDiff(disp12MaxDiff);
+
+      gpuAlg.compute(rect_left_frame_cvmat, rect_right_frame_cvmat, disp);
       disp.convertTo(disparity, CV_32F, 1.0);
-      disparity = (disparity/16.0f-(float)80)/(float)8;
+      disparity = (disparity/16.0f-(float)minDisparity)/(float)numDisparities;
+
+
       cv::imshow("disparity", disparity);
       //} catch (...) {
       //RCLCPP_INFO(this->get_logger(), "Fail to copy sensor_msgs::msg::Image.data to cv::Mat ");
