@@ -60,14 +60,14 @@ namespace LUCIDStereo {
 int numDisparities = 4;
 int blockSize = 0;
 int P1 = 150;
-int P2 = 180;
+int P2 = 150;
 int preFilterCap = 0;
-int minDisparity = 184;
+int minDisparity = 159;
 int uniquenessRatio = 0;
 int speckleRange = 0;
 int speckleWindowSize = 0;
 int disp12MaxDiff = 0;
-  bool on_flag = true;
+
   class StereoSingleGpu{
   public:
     explicit StereoSingleGpu(int deviceId = 0);
@@ -301,14 +301,14 @@ class SyncFrameRecv : public rclcpp::Node {
                     std::move(dual_frame));
       //cv::resize(left_frame_cvmat, outImg, cv::Size(), 1, 1);
       cv::imshow("left", rect_left_frame_cvmat);
-      if(on_flag){
-      std::vector<int> compression_params;
-      compression_params.push_back(cv::IMWRITE_PNG_COMPRESSION);
-      compression_params.push_back(9);
-      cv::imwrite("./samples_left.png", left_frame_cvmat, compression_params);
-      cv::imwrite("./samples_right.png", right_frame_cvmat, compression_params);
-      on_flag = false;
-      }
+      //if(on_flag){
+      //std::vector<int> compression_params;
+      //compression_params.push_back(cv::IMWRITE_PNG_COMPRESSION);
+      //compression_params.push_back(9);
+      //cv::imwrite("./samples_left.png", left_frame_cvmat, compression_params);
+      //cv::imwrite("./samples_right.png", right_frame_cvmat, compression_params);
+      //on_flag = false;
+      //}
       //cv::resize(right_frame_cvmat, outImg, cv::Size(), 1, 1);
       cv::imshow("right",rect_right_frame_cvmat);
       //cv::imshow("view", );
@@ -337,7 +337,7 @@ class SyncFrameRecv : public rclcpp::Node {
 
       gpuAlg.compute(rect_left_frame_cvmat, rect_right_frame_cvmat, disp);
       disp.convertTo(disparity, CV_32F, 1.0);
-      disparity = (disparity/16.0f-(float)minDisparity)/(float)numDisparities;
+      disparity = (disparity/16.0f-(float)minDisparity)/((float)numDisparities*16);
 
 
       cv::imshow("disparity", disparity);
