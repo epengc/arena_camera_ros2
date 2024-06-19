@@ -62,7 +62,8 @@ int blockSize = 0;
 int P1 = 150;
 int P2 = 150;
 int preFilterCap = 0;
-int minDisparity = 159;
+//int minDisparity = 159;
+int minDisparity = 352;
 int uniquenessRatio = 0;
 int speckleRange = 0;
 int speckleWindowSize = 0;
@@ -219,16 +220,16 @@ class SyncFrameRecv : public rclcpp::Node {
    //// Declaring parameters triggers the previously registered callback
    //this->declare_parameter<disparityParameters>("disparity_params", disparity_params);
    // For avoiding incompatible QoSInitialization by using rclcpp::SensorDataQoS()
-   cv::createTrackbar("numDisparities",    "disparity", &numDisparities,    32,  on_trackbar1);
-   cv::createTrackbar("blockSize",         "disparity", &blockSize,         50,  on_trackbar2);
-   cv::createTrackbar("P1",                "disparity", &P1,                150, on_trackbar3);
-   cv::createTrackbar("P2",                "disparity", &P2,                150, on_trackbar4);
-   cv::createTrackbar("preFilterCap",      "disparity", &preFilterCap,      62,  on_trackbar5);
-   cv::createTrackbar("minDisparity",      "disparity", &minDisparity,      400, on_trackbar6);
-   cv::createTrackbar("uniquenessRatio",   "disparity", &uniquenessRatio,   100, on_trackbar7);
-   cv::createTrackbar("speckleRange",      "disparity", &speckleRange,      100, on_trackbar8);
-   cv::createTrackbar("speckleWindowSize", "disparity", &speckleWindowSize, 25,  on_trackbar9);
-   cv::createTrackbar("dips12MaxDiff",     "disparity", &disp12MaxDiff,     25,  on_trackbar10);
+   //cv::createTrackbar("numDisparities",    "disparity", &numDisparities,    32,  on_trackbar1);
+   //cv::createTrackbar("blockSize",         "disparity", &blockSize,         50,  on_trackbar2);
+   //cv::createTrackbar("P1",                "disparity", &P1,                150, on_trackbar3);
+   //cv::createTrackbar("P2",                "disparity", &P2,                150, on_trackbar4);
+   //cv::createTrackbar("preFilterCap",      "disparity", &preFilterCap,      62,  on_trackbar5);
+   //cv::createTrackbar("minDisparity",      "disparity", &minDisparity,      400, on_trackbar6);
+   //cv::createTrackbar("uniquenessRatio",   "disparity", &uniquenessRatio,   100, on_trackbar7);
+   //cv::createTrackbar("speckleRange",      "disparity", &speckleRange,      100, on_trackbar8);
+   //cv::createTrackbar("speckleWindowSize", "disparity", &speckleWindowSize, 25,  on_trackbar9);
+   //cv::createTrackbar("dips12MaxDiff",     "disparity", &disp12MaxDiff,     25,  on_trackbar10);
    subscription_ = this->create_subscription<sensor_msgs::msg::Image>("/arena_camera_node/images", rclcpp::SensorDataQoS(), std::bind(&SyncFrameRecv::disparity_publisher_callback,
                                                                                                                                       this,
                                                                                                                                       _1));
